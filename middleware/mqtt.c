@@ -175,19 +175,12 @@ void disconnectMqtt() {
     case MQTT_CLIENT_STATE_DISCONNECTED:
         //do nothing, client already disconnected
         break;
-    case MQTT_CLIENT_STATE_TCP_CONNECTING:
-
-        break;
-    case MQTT_CLIENT_STATE_TCP_CONNECTED:
-
-        break;
-    case MQTT_CLIENT_STATE_MQTT_CONNECTING:
-
-        break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
+        sendMqttMessage(MQTT_DISCONNECT);
         socketCloseTcp(mqclient->socket);
         break;
-        }
+    default:
+        break;
     }
 }
 
@@ -218,6 +211,13 @@ void runMqttClient() { //extern these maybe?
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
 
         break;
+    case MQTT_CLIENT_STATE_MQTT_DISCONNECTING:
+        if (mqclient->socket->state == TCP_CLOSED) {
+            setMqttState(MQTT_CLIENT_STATE_MQTT_DISCONNECTED);
+            deleteSocket(err->sk);
+        }
+        break;
+
     }
 }
 
