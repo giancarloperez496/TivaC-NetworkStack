@@ -261,7 +261,7 @@ void stopEtherMemRead(void)
 
 void resetEther() {
     setPinValue(RESET, 0);
-    waitMicrosecond(100);
+    waitMicrosecond(1500);
     setPinValue(RESET, 1);
     // make sure that oscillator start-up timer has expired
     while ((readEtherReg(ESTAT) & CLKRDY) == 0) {}

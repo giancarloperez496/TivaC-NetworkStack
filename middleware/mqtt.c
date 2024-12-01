@@ -109,6 +109,7 @@ void socketErrorCallback(void* context) {
     deleteSocket(mqclient.socket);
 }*/
 
+//generic error handler, other functions willcall this if needed
 void mqttErrorCallback(void* context) {
     mqttError* err = (mqttError*)context;
     switch(err->errorCode) {
@@ -135,10 +136,11 @@ void mqttRetryConnection() {
         attempts++;
         if (attempts == MAX_CONNECT_RETRIES) {
             attempts = 1;
+            socketCloseTcp(mqclient->socket);
             setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
         }
         else {
-            timeoutTimer = startOneshotTimer(mqttConnectTimeout, 5, NULL);
+            timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
         }
     }
     else {
@@ -175,6 +177,9 @@ void disconnectMqtt() {
     case MQTT_CLIENT_STATE_DISCONNECTED:
         //do nothing, client already disconnected
         break;
+    case MQTT_CLIENT_STATE_TCP_CONNECTING:
+
+        break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
         sendMqttMessage(MQTT_DISCONNECT);
         socketCloseTcp(mqclient->socket);
@@ -186,12 +191,20 @@ void disconnectMqtt() {
 
 //main loop
 void runMqttClient() { //extern these maybe?
+    socket* mqsocket = mqclient->socket;
     uint8_t mqttState = getMqttState();
+    uint8_t tcpState = getTcpState(mqsocket);
+    //handleTransition();
     switch (mqttState) {
     case MQTT_CLIENT_STATE_DISCONNECTED:
         break;
     case MQTT_CLIENT_STATE_TCP_CONNECTING:
-        if (mqclient->socket->state == TCP_ESTABLISHED) {
+        //lowkey need a better way to check if the socket is ready, either by callback or something?
+        /*
+         * onTcpEstablished(socket) {
+
+        */
+        if (tcpState == TCP_ESTABLISHED) {
             //putsUart0("Connection established");
             setMqttState(MQTT_CLIENT_STATE_TCP_CONNECTED);
         }
@@ -209,12 +222,15 @@ void runMqttClient() { //extern these maybe?
         //check if timeout? if timeout expired go back to TCP connected, basically what i said above, can either use startTimer or millis()
         break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
-
+        if (tcpState == TCP_CLOSE_WAIT) {
+            setMqttState(MQTT_CLIENT_STATE_DISCONNECTING);
+            socketCloseTcp(mqsocket);
+        }
         break;
-    case MQTT_CLIENT_STATE_MQTT_DISCONNECTING:
-        if (mqclient->socket->state == TCP_CLOSED) {
-            setMqttState(MQTT_CLIENT_STATE_MQTT_DISCONNECTED);
-            deleteSocket(err->sk);
+    case MQTT_CLIENT_STATE_DISCONNECTING:
+        if (tcpState == TCP_CLOSED) {
+            setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
+            deleteSocket(mqsocket);
         }
         break;
 

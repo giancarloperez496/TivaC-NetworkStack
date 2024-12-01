@@ -87,7 +87,7 @@ void processTcpArpResponse(etherHeader *ether);
 
 tcpHeader* getTcpHeader(etherHeader* ether);
 uint8_t* getTcpData(etherHeader* ether);
-
+void pendTcpResponse(socket* s, uint8_t flags);
 void openTcpConnection(etherHeader* ether, socket* s);
 void completeTcpConnection(etherHeader* ether, socket* s);
 void closeTcpConnection(etherHeader* ether, socket* s);

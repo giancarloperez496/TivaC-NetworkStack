@@ -274,14 +274,22 @@ void completeTcpConnection(etherHeader* ether, socket* s) {
     uint32_t ISN = random32();
     s->sequenceNumber = ISN;
     s->acknowledgementNumber = 0;
-    setTcpState(TCP_SYN_SENT);
-    pendTcpResponse(SYN);
+    setTcpState(s, TCP_SYN_SENT);
+    pendTcpResponse(s, SYN);
 
 }
 
 void closeTcpConnection(etherHeader* ether, socket* s) {
-    sendTcpResponse(ether, s, FIN | ACK);
-    setTcpState(s, TCP_FIN_WAIT_1);
+    switch (s->state) {
+    case TCP_ESTABLISHED: //if we're calling socketCloseTcp() while established
+        pendTcpResponse(s, FIN | ACK);
+        setTcpState(s, TCP_FIN_WAIT_1);
+        break;
+    case TCP_CLOSE_WAIT:
+        pendTcpResponse(s, FIN | ACK);
+        setTcpState(s, TCP_LAST_ACK);
+        break;
+    }
 }
 
 
@@ -294,21 +302,13 @@ void sendTcpPendingMessages(etherHeader* ether) {
         if (s->valid) {
             if (s->flags) {
                 uint16_t flags = s->flags;
+                updateSeqNum(s, ether);
                 sendTcpResponse(ether, s, flags);
                 s->flags = 0; //reset flags
                 switch (s->state) {
                 case TCP_SYN_SENT:
                     s->assocTimer = startOneshotTimer(tcpTimeoutCallback, 15, s);
                     break;
-                }
-            }
-            else {
-                if (s->state == TCP_CLOSE_WAIT) {
-                    //if application ready {
-                        //APPLICATION NEEDS TO CHECK FOR FIN THEN CALL CLOSE
-                        //CLOSE WILL THEN SEND FIN AND MOVE TO LAST_ACK, SERVER WILL SEND FINAL ACK.
-                        pendTcpResponse(FIN | ACK);
-                    //}
                 }
             }
         }
@@ -339,15 +339,30 @@ void pendTcpResponse(socket* s, uint8_t flags) {
     s->flags = flags;
 }
 
-void adjustTcpAckNum(socket* s, uint8_t flags, uint32_t dataLength) {
-    if (s) {
+void tcpTimeWaitCallback(void* context) {
+    socket* s = (socket*)context;
+    setTcpState(s, TCP_CLOSED);
+}
+
+//used when sending
+void updateSeqNum(socket* s, etherHeader* ether) {
+    if (isTcpSyn(ether) || isTcpFin(ether)) {
+        s->sequenceNumber += 1;
+    }
+    else {
 
     }
 }
 
-void tcpTimeWaitCallback(void* context) {
-    socket* s = (socket*)context;
-    setTcpState(s, TCP_CLOSED);
+//used when receiving
+void updateAckNum(socket* s, etherHeader* ether) {
+    tcpHeader* tcp = getTcpHeader(ether);
+    if (isTcpSyn(ether) || isTcpFin(ether)) {
+        s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+    }
+    else {
+
+    }
 }
 
 void processTcpResponse(etherHeader* ether) {
@@ -356,14 +371,13 @@ void processTcpResponse(etherHeader* ether) {
     uint16_t remotePort = ntohs(tcp->sourcePort);
     socket* s = getSocketFromLocalPort(localPort); //192.168.1.118:50115 -> 192.168.1.16:8080
     if (s) {
+        updateAckNum(s, ether);
         switch (s->state) {
         case TCP_CLOSED:
             break;
         case TCP_SYN_SENT:
             if (isTcpSyn(ether) && isTcpAck(ether)) {
                 stopTimer(s->assocTimer);
-                s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
-                s->sequenceNumber += 1;
                 pendTcpResponse(s, ACK); //s->flags = ACK;
                 setTcpState(s, TCP_ESTABLISHED); //s->state = TCP_ESTABLISHED;
             }
@@ -382,6 +396,7 @@ void processTcpResponse(etherHeader* ether) {
             }
             break;
         case TCP_CLOSE_WAIT:
+            //invoked by socketCloseTcp() from application
             //pendTcpResponse(FIN | ACK);
             break;
         case TCP_LAST_ACK:
@@ -390,14 +405,24 @@ void processTcpResponse(etherHeader* ether) {
             }
             break;
         case TCP_FIN_WAIT_1:
+            if (isTcpFin(ether)) {
+                pendTcpResponse(s, ACK);
+                setTcpState(s, TCP_CLOSING);
+            }
             if (isTcpAck(ether)) {
                 setTcpState(s, TCP_FIN_WAIT_2);
+            }
+            break;
+        case TCP_CLOSING:
+            if (isTcpAck(ether)) {
+                setTcpState(s, TCP_TIME_WAIT);
+                startOneshotTimer(tcpTimeWaitCallback, 10, s);
             }
             break;
         case TCP_FIN_WAIT_2:
             if (isTcpFin(ether)) {
                 pendTcpResponse(s, ACK);
-                setTcpState(TCP_TIME_WAIT);
+                setTcpState(s, TCP_TIME_WAIT);
                 startOneshotTimer(tcpTimeWaitCallback, 10, s);
             }
             break;
