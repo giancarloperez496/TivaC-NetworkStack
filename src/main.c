@@ -80,6 +80,12 @@ void initHw() {
 // Max packet is calculated as:
 // Ether frame header (18) + Max MTU (1500)
 
+/*
+ * Active Open works
+ * Active Close works
+ * Passive Close - needs work
+ * Passive open - server
+ */
 int main(void) {
     // Init controller
     initHw();

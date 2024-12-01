@@ -389,8 +389,6 @@ void processTcpResponse(etherHeader* ether) {
                 //s->flags = ACK;
             }
             if (isTcpFin(ether)) {
-                s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
-                s->sequenceNumber += 1;
                 pendTcpResponse(s, ACK); //s->flags = FIN | ACK;
                 setTcpState(s, TCP_CLOSE_WAIT);
             }
