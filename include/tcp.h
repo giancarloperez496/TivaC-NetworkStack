@@ -81,6 +81,9 @@ bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
 bool isTcpFin(etherHeader* ether);
 
+void updateSeqNum(socket* s, etherHeader* ether);
+void updateAckNum(socket* s, etherHeader* ether);
+
 void sendTcpPendingMessages(etherHeader *ether);
 void processDhcpResponse(etherHeader *ether);
 void processTcpArpResponse(etherHeader *ether);

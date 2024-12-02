@@ -302,12 +302,12 @@ void sendTcpPendingMessages(etherHeader* ether) {
         if (s->valid) {
             if (s->flags) {
                 uint16_t flags = s->flags;
-                updateSeqNum(s, ether);
                 sendTcpResponse(ether, s, flags);
+                updateSeqNum(s, ether);
                 s->flags = 0; //reset flags
                 switch (s->state) {
                 case TCP_SYN_SENT:
-                    s->assocTimer = startOneshotTimer(tcpTimeoutCallback, 15, s);
+                    //s->assocTimer = startOneshotTimer(tcpTimeoutCallback, 15, s);
                     break;
                 }
             }
@@ -342,6 +342,7 @@ void pendTcpResponse(socket* s, uint8_t flags) {
 void tcpTimeWaitCallback(void* context) {
     socket* s = (socket*)context;
     setTcpState(s, TCP_CLOSED);
+    deleteSocket(s);
 }
 
 //used when sending
@@ -400,6 +401,7 @@ void processTcpResponse(etherHeader* ether) {
         case TCP_LAST_ACK:
             if (isTcpAck(ether)) {
                 setTcpState(s, TCP_CLOSED);
+                deleteSocket(s);
             }
             break;
         case TCP_FIN_WAIT_1:

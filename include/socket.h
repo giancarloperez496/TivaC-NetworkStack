@@ -48,7 +48,7 @@ typedef struct _socket {
     _tim_callback_t errorCallback;
 } socket;
 
-#define SOCKET_ERROR_MAX_MSG_LEN 50
+#define SOCKET_ERROR_MAX_MSG_LEN 60
 #define SOCKET_ERROR_NO_ERROR 0
 #define SOCKET_ERROR_ARP_TIMEOUT 1
 #define SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT 2

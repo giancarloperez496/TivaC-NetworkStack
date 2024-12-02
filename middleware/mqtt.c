@@ -54,7 +54,7 @@ typedef struct _mqttClient {
 //we are assuming mqclient is a singleton and only one instance can run on this device. functions shall not take parameters as they will modify this singleton
 mqttClient mqclient[1]; //# of MQTT instances, if i want to have more functions NEED to take a client param
 uint8_t mqttBuffer[256];
-char out[100];
+char out[50];
 
 //if i want to make mqttclient a singleton of some sort, i can define it in here and just use it all as a global instead of function parameters, similar to dhcp
 
@@ -88,10 +88,75 @@ void initMqtt() {
 
 uint8_t timeoutTimer;
 
+/*void resetMqtt() {
+    setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
+    deleteSocket(mqclient.socket);
+}*/
+
+//main client loop
+void runMqttClient() { //extern these maybe?
+    socket* mqsocket = mqclient->socket;
+    uint8_t mqttState = getMqttState();
+    uint8_t tcpState = getTcpState(mqsocket);
+    //handleTransition();
+    switch (mqttState) {
+    case MQTT_CLIENT_STATE_DISCONNECTED:
+        break;
+    case MQTT_CLIENT_STATE_TCP_CONNECTING:
+        //lowkey need a better way to check if the socket is ready, either by callback or something?
+        /*
+         * onTcpEstablished(socket) {
+
+        */
+        if (tcpState == TCP_ESTABLISHED) {
+            putsUart0("TCP Connection established\n");
+            setMqttState(MQTT_CLIENT_STATE_TCP_CONNECTED);
+        }
+        break;
+    case MQTT_CLIENT_STATE_TCP_CONNECTED:
+        sendMqttMessage(MQTT_CONNECT);
+        setMqttState(MQTT_CLIENT_STATE_MQTT_CONNECTING);
+        if (MAX_CONNECT_RETRIES > 0) {
+            //timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
+        }
+        break;
+    case MQTT_CLIENT_STATE_MQTT_CONNECTING:
+        //handle CONNACK in callback or something
+        //check if timeout? if timeout expired go back to TCP connected, basically what i said above, can either use startTimer or millis()
+        if (tcpState == TCP_CLOSE_WAIT) {
+            disconnectMqtt();
+            //setMqttState(MQTT_CLIENT_STATE_DISCONNECTING);
+            //socketCloseTcp(mqsocket);
+        }
+        break;
+    case MQTT_CLIENT_STATE_MQTT_CONNECTED:
+        if (tcpState == TCP_CLOSE_WAIT) {
+            //setMqttState(MQTT_CLIENT_STATE_DISCONNECTING);
+            //socketCloseTcp(mqsocket);
+            disconnectMqtt();
+        }
+        break;
+    case MQTT_CLIENT_STATE_DISCONNECTING:
+        if (tcpState == TCP_CLOSED) {
+            setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
+            //deleteSocket(mqsocket);
+            //how do we know that the socket finished closing?
+            //if !s.valid?
+            //checking state may be iffy
+            //callback?
+        }
+        break;
+
+    }
+}
+
+//Application level error handler, application can handle Layer 4 errors here
+//Layer 4 calls this function
 void socketErrorCallback(void* context) {
     socketError* err = (socketError*)context;
     //if i want to retry TCP connections, i can call connectMqtt() again
     switch (err->errorCode) {
+    //TCP layer errors
     case SOCKET_ERROR_ARP_TIMEOUT:
         setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
         break;
@@ -104,15 +169,12 @@ void socketErrorCallback(void* context) {
     //err->sk should ALWAYS be the same as mqclient->socket
 }
 
-/*void resetMqtt() {
-    setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
-    deleteSocket(mqclient.socket);
-}*/
-
-//generic error handler, other functions willcall this if needed
+//Application error handler, application will handle Layer 7 errors here
+//Layer 7 calls this function
 void mqttErrorCallback(void* context) {
     mqttError* err = (mqttError*)context;
     switch(err->errorCode) {
+    //MQTT layer errors
     case MQTT_ERROR_CONNECT_TIMEOUT:
         mqttRetryConnection();
         break;
@@ -122,25 +184,29 @@ void mqttErrorCallback(void* context) {
 
 
 void mqttConnectTimeout(void* context) {
-    //if context == socket_error;
-    //we don't know what type context will be
+    //if state == connecting else ignore??
     mqttError err;
     err.errorCode = MQTT_ERROR_CONNECT_TIMEOUT;
+    //call connectMqtt() again as needed
     str_copy(err.errorMsg, "Timed out waiting for MQTT Connect from broker.\n");
     mqttErrorCallback(&err);
 }
 
 void mqttRetryConnection() {
-    static uint8_t attempts = 1;
-    if (getMqttState() == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
+    static uint8_t attempts = 0;
+    uint8_t mqstate = getMqttState();
+    if (mqstate == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
         attempts++;
         if (attempts == MAX_CONNECT_RETRIES) {
-            attempts = 1;
-            socketCloseTcp(mqclient->socket);
-            setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
+            putsUart0("Reached max number of attempts to connect to broker; resetting connection...\n");
+            attempts = 0;
+            //socketCloseTcp(mqclient->socket);
+            //setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
+            disconnectMqtt();
         }
         else {
-            timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
+            //putsUart0("Retrying connection to MQTT Broker...\n");
+            //timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
         }
     }
     else {
@@ -159,7 +225,7 @@ void connectMqtt() {
         mqclient->socket = newSocket();
         mqclient->socket->errorCallback = socketErrorCallback;
         getIpMqttBrokerAddress(mqserv);
-        snprintf(out, 100, "Connecting to MQTT server %d.%d.%d.%d:%d\n", mqserv[0], mqserv[1], mqserv[2], mqserv[3], MQTT_PORT);
+        snprintf(out, 50, "Connecting to MQTT server %d.%d.%d.%d:%d\n", mqserv[0], mqserv[1], mqserv[2], mqserv[3], MQTT_PORT);
         putsUart0(out);
         socketConnectTcp(mqclient->socket, mqserv, MQTT_PORT);
         setMqttState(MQTT_CLIENT_STATE_TCP_CONNECTING);
@@ -178,63 +244,22 @@ void disconnectMqtt() {
         //do nothing, client already disconnected
         break;
     case MQTT_CLIENT_STATE_TCP_CONNECTING:
-
+        //never got SYN ACK, should be handled by socketErrorCallback
+        break;
+    case MQTT_CLIENT_STATE_MQTT_CONNECTING:
+        //never got CONNACK, client wants to close connection
+        sendMqttMessage(MQTT_DISCONNECT);
+        socketCloseTcp(mqclient->socket);
         break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
+        //got CONNACK, client wants to close connection
         sendMqttMessage(MQTT_DISCONNECT);
         socketCloseTcp(mqclient->socket);
         break;
     default:
         break;
     }
-}
-
-//main loop
-void runMqttClient() { //extern these maybe?
-    socket* mqsocket = mqclient->socket;
-    uint8_t mqttState = getMqttState();
-    uint8_t tcpState = getTcpState(mqsocket);
-    //handleTransition();
-    switch (mqttState) {
-    case MQTT_CLIENT_STATE_DISCONNECTED:
-        break;
-    case MQTT_CLIENT_STATE_TCP_CONNECTING:
-        //lowkey need a better way to check if the socket is ready, either by callback or something?
-        /*
-         * onTcpEstablished(socket) {
-
-        */
-        if (tcpState == TCP_ESTABLISHED) {
-            //putsUart0("Connection established");
-            setMqttState(MQTT_CLIENT_STATE_TCP_CONNECTED);
-        }
-        break;
-    case MQTT_CLIENT_STATE_TCP_CONNECTED:
-        sendMqttMessage(MQTT_CONNECT);
-        setMqttState(MQTT_CLIENT_STATE_MQTT_CONNECTING);
-        if (MAX_CONNECT_RETRIES > 0) {
-            timeoutTimer = startOneshotTimer(mqttConnectTimeout, 5, NULL);
-        }
-        //startTimer() --mqttConnectTimeout() -- call connectMqtt() again as needed
-        break;
-    case MQTT_CLIENT_STATE_MQTT_CONNECTING:
-        //handle CONNACK in callback or something
-        //check if timeout? if timeout expired go back to TCP connected, basically what i said above, can either use startTimer or millis()
-        break;
-    case MQTT_CLIENT_STATE_MQTT_CONNECTED:
-        if (tcpState == TCP_CLOSE_WAIT) {
-            setMqttState(MQTT_CLIENT_STATE_DISCONNECTING);
-            socketCloseTcp(mqsocket);
-        }
-        break;
-    case MQTT_CLIENT_STATE_DISCONNECTING:
-        if (tcpState == TCP_CLOSED) {
-            setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
-            deleteSocket(mqsocket);
-        }
-        break;
-
-    }
+    setMqttState(MQTT_CLIENT_STATE_DISCONNECTING);
 }
 
 //use strlib eventually
@@ -318,27 +343,7 @@ uint8_t encodeLength(uint8_t* out, uint32_t i) {
 
 // returns return code
 //void connectMqtt() {
-    /*
-    if (stat != 0) {
-        putsUart0("Unable to connect to the server\n");
-        return;
-    }
-     */
-    /*if (client->state == MQTT_CLIENT_STATE_TCP_CONNECTED) {
-        if (client->state == MQTT_STATE_CONNECTED) {
-            if (client->socket != NULL) {
-                client->state = MQTT_CLOSING;
-                sendMqttMessage(client, MQTT_DISCONNECT);
-                socketCloseTcp(client->socket);
-            }
-        }
-        else {
 
-        }
-    }*/
-    //else {
-        //cannot connect/
-    //}
     /*etherHeader* ether = (etherHeader*)etherbuffer;
     if (s) {
         uint32_t i = 0;
@@ -414,6 +419,7 @@ uint8_t encodeLength(uint8_t* out, uint32_t i) {
     }*/
 
 void publishMqtt(char strTopic[], char strData[]) {
+    sendMqttMessage();
     /*etherHeader* ether = (etherHeader*)etherbuffer;
     socket* s = getMqttSocket();
     if (s) {
