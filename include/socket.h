@@ -37,6 +37,7 @@ typedef struct _socket {
     //TCP
     uint32_t sequenceNumber;
     uint32_t acknowledgementNumber;
+    uint32_t expectedSeqNumber;
     uint8_t  state;
     uint8_t* rx_buffer;
     uint16_t rx_size;
@@ -44,6 +45,7 @@ typedef struct _socket {
     uint16_t tx_size;
     uint16_t flags;
     uint8_t assocTimer;
+    bool retransmitting;
     uint8_t  valid;
     _tim_callback_t errorCallback;
 } socket;

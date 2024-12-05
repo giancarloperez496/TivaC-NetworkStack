@@ -81,7 +81,6 @@ socket* getSocketFromTimer(uint8_t id) {
 // Subroutines
 //-----------------------------------------------------------------------------
 
-#define WINDOW_SIZE 1460
 #define MAX_INITSOCKS 5
 
 typedef void(* _fn)(void);
@@ -169,29 +168,6 @@ bool isTcpPsh(etherHeader* ether) {
     return htons(tcp->offsetFields) & PSH;
 }
 
-//socket* initSockQ[5] = {0};
-//uint8_t initSockQSize = 0;
-
-/*void enqueue_socket(socket* s) {
-    if (initSockQSize < 5) {
-        initSockQ[initSockQSize++] = s;
-    }
-}
-
-socket* dequeue_socket(uint8_t idx) {
-    if (idx >= initSockQSize) {
-        return NULL;
-    }
-    uint32_t i;
-    socket* retSock = initSockQ[idx];
-    for (i = idx; i < initSockQSize - 1; i++) {
-        initSockQ[i] = initSockQ[i+1];
-    }
-    initSockQSize--;
-    return retSock;
-}*/
-
-
 /*void resetConCallback(void* context) { //make this function take a parameter if needed
 
     snprintf(out, 100, "Could not reach %d.%d.%d.%d (timed out)\n", initSock->remoteIpAddress[0], initSock->remoteIpAddress[1], initSock->remoteIpAddress[2], initSock->remoteIpAddress[3]);
@@ -215,7 +191,9 @@ void handleSocketError(socket* s, uint8_t errorCode) {
     }
 }
 
+//implement FIN_WAIT timeout and other necessary ones
 void tcpTimeoutCallback(void* context) {
+    static uint8_t attempts = 0;
     socket* s = (socket*)context;
     if (s) {
         s->assocTimer = INVALID_TIMER;
@@ -223,13 +201,27 @@ void tcpTimeoutCallback(void* context) {
         case TCP_CLOSED:
             //arping timed out
             handleSocketError(s, SOCKET_ERROR_ARP_TIMEOUT);
+            setTcpState(s, TCP_CLOSED);
             break;
         case TCP_SYN_SENT:
             //synack timed out
-            handleSocketError(s, SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT);
+            attempts++;
+            if (attempts == 2) {
+                putsUart0("Reached max number of attempts to connect to server\n");
+                attempts = 0;
+                handleSocketError(s, SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT);
+                setTcpState(s, TCP_CLOSED);
+            }
+            else {
+                //putsUart0("Retrying connection to server...\n");
+                //s->retransmitting = 1; //used to not incremen SEQ
+                s->sequenceNumber--;
+                pendTcpResponse(s, SYN);
+                setTcpState(s, TCP_SYN_SENT);
+            }
             break;
         }
-        s->state = TCP_CLOSED;
+        //s->state = TCP_CLOSED;
     }
 
 }
@@ -246,7 +238,7 @@ void openTcpConnection(etherHeader* ether, socket* s) {
     uint8_t arpEntryExists = lookupArpEntry(s->remoteIpAddress, remoteMac);
     if (arpEntryExists) {
         copyMacAddress(s->remoteHwAddress, remoteMac);
-        completeTcpConnection(ether, s);
+        completeTcpConCallback(ether, s);
     }
     else {
         sendArpRequest(ether, localIp, isIpLocal ? s->remoteIpAddress : gateway); //if IP is in same subnet, send ARP for that IP, else send ARP to gateway
@@ -255,28 +247,12 @@ void openTcpConnection(etherHeader* ether, socket* s) {
     }
 }
 
-void completeTcpConnection(etherHeader* ether, socket* s) {
-    /*uint8_t  remoteIpAddress[4]; X
-    uint8_t  remoteHwAddress[6]; X
-    uint16_t remotePort; X
-    uint16_t localPort; X
-    //TCP
-    uint32_t sequenceNumber; X
-    uint32_t acknowledgementNumber; X
-    uint8_t  state; X
-    uint8_t* rx_buffer;
-    uint16_t rx_size;
-    uint8_t* tx_buffer;
-    uint16_t tx_size;
-    uint16_t flags; X
-    uint8_t assocTimer;
-    uint8_t  valid;*/
+void completeTcpConCallback(etherHeader* ether, socket* s) {
     uint32_t ISN = random32();
     s->sequenceNumber = ISN;
     s->acknowledgementNumber = 0;
     setTcpState(s, TCP_SYN_SENT);
     pendTcpResponse(s, SYN);
-
 }
 
 void closeTcpConnection(etherHeader* ether, socket* s) {
@@ -292,7 +268,11 @@ void closeTcpConnection(etherHeader* ether, socket* s) {
     }
 }
 
+//potentially make a message Queue to send multiple flags in one loop e.g.
+//tcp.c sets ACK Flag
+//mqtt.c or application sets FIN ACK when ready, will overwrite the single ACK
 
+bool fin = 0;
 // Looping function
 void sendTcpPendingMessages(etherHeader* ether) {
     uint32_t i;
@@ -303,13 +283,22 @@ void sendTcpPendingMessages(etherHeader* ether) {
             if (s->flags) {
                 uint16_t flags = s->flags;
                 sendTcpResponse(ether, s, flags);
-                updateSeqNum(s, ether);
-                s->flags = 0; //reset flags
+                //switch statement is for actions to happen once sent
                 switch (s->state) {
                 case TCP_SYN_SENT:
-                    //s->assocTimer = startOneshotTimer(tcpTimeoutCallback, 15, s);
+                    s->assocTimer = startOneshotTimer(tcpTimeoutCallback, 3, s);
+                    break;
+                case TCP_ESTABLISHED:
+                    if ((flags & ACK) && fin) {
+                        setTcpState(s, TCP_CLOSE_WAIT); //set state once ACK sent
+                        fin = 0;
+                    }
                     break;
                 }
+
+                updateSeqNum(s, ether);
+                s->flags = 0; //reset flags
+                //s->retransmitting = 0; //reset rtx flag
             }
         }
     }
@@ -327,6 +316,13 @@ uint8_t* getTcpData(etherHeader* ether) {
     tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
     uint8_t* payload = tcp->data;
     return payload;
+}
+
+uint16_t getTcpDataLength(etherHeader* ether) {
+    ipHeader* ip = getIpHeader(ether);
+    tcpHeader* tcp = getTcpHeader(ether);
+    uint16_t payload_length = ntohs(ip->length) - (ip->size * 4) - ((ntohs(tcp->offsetFields) >> 12) * 4);
+    return payload_length;
 }
 
 uint8_t isTcpDataAvailable(etherHeader* ether) {
@@ -347,22 +343,37 @@ void tcpTimeWaitCallback(void* context) {
 
 //used when sending
 void updateSeqNum(socket* s, etherHeader* ether) {
+    //if (!s->retransmitting) {
     if (isTcpSyn(ether) || isTcpFin(ether)) {
         s->sequenceNumber += 1;
     }
-    else {
-
+    else if (isTcpPsh(ether)) {
+        uint16_t len = getTcpDataLength(ether);
+        s->sequenceNumber += len;
     }
+    //}
 }
 
 //used when receiving
 void updateAckNum(socket* s, etherHeader* ether) {
     tcpHeader* tcp = getTcpHeader(ether);
-    if (isTcpSyn(ether) || isTcpFin(ether)) {
-        s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+    uint8_t state = getTcpState(s);
+    if (state != TCP_ESTABLISHED) {
+        if (isTcpSyn(ether) || isTcpFin(ether)) {
+            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+        }
     }
     else {
-
+        if (isTcpPsh(ether)) {
+            uint16_t len = getTcpDataLength(ether);
+            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + len;
+        }
+        else if (isTcpFin(ether)) {
+            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+        }
+        else if (isTcpAck(ether)) {
+            //s->acknowledgementNumber = ntohl(tcp->acknowledgementNumber);
+        }
     }
 }
 
@@ -388,10 +399,15 @@ void processTcpResponse(etherHeader* ether) {
                 //s->rx_buffer
                 //s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + DATA_LENGTH;
                 //s->flags = ACK;
+                pendTcpResponse(s, ACK);
             }
-            if (isTcpFin(ether)) {
+            else if (isTcpFin(ether)) {
                 pendTcpResponse(s, ACK); //s->flags = FIN | ACK;
-                setTcpState(s, TCP_CLOSE_WAIT);
+                fin = 1;
+                //setTcpState(s, TCP_CLOSE_WAIT);
+            }
+            else if (isTcpAck(ether)) {
+
             }
             break;
         case TCP_CLOSE_WAIT:
@@ -436,14 +452,13 @@ void processTcpArpResponse(etherHeader* ether) {
     socket* sockets = getSockets();
     for (i = 0; i < MAX_SOCKETS; i++) {
         socket* s = &sockets[i];
-        if (isIpEqual(s->remoteIpAddress, arp->sourceIp)) {
+        if (isIpEqual(s->remoteIpAddress, arp->sourceIp)) {//checking socket by IP since ARP doesnt have port #
             if (s->state == TCP_CLOSED) {
-                //checking socket by IP,
                 //problem w this is that if multiple sockets point to same IP, it will only find the first one.
                 //maybe make a way to track which sockets are ARPing (queue? idk)
                 stopTimer(s->assocTimer); //MAYBE MAKE DIFF TIMERS OR CALLBACKS FOR SOCKETS IF NEEDED!
                 copyMacAddress(s->remoteHwAddress, arp->sourceAddress);
-                completeTcpConnection(ether, s);
+                completeTcpConCallback(ether, s);
                 break;
             }
         }
@@ -464,11 +479,42 @@ bool isTcpPortOpen(etherHeader* ether) {
     return false;
 }
 
+//len is the value shown in wireshark
+void addTcpOption(uint8_t* options_ptr, uint8_t option_type, uint8_t len, uint8_t data[], uint8_t* options_length) {
+    static uint8_t* last;
+    if (options_ptr == NULL) {
+        options_ptr = last;
+    }
+    if (options_ptr == NULL) {
+        return;
+    }
+    uint32_t i = 0;
+    uint32_t j;
+    options_ptr[i++] = option_type;
+    if (option_type != TCP_OPTION_NO_OP) {
+        options_ptr[i++] = len;
+        for (j = 0; j < len-2; j++) {
+            options_ptr[i++] = data[j];
+        }
+        if (options_length) {
+            *options_length += len;
+        }
+        last = options_ptr + len;
+    }
+    else {
+        if (options_length) {
+            *options_length += 1;
+        }
+        last = options_ptr + 1;
+    }
+}
+
 void sendTcpResponse(etherHeader* ether, socket* s, uint16_t flags){
-    uint8_t i;
     uint32_t sum;
     uint16_t tmp16;
     uint16_t tcpLength;
+    uint8_t i;
+    uint8_t options_length = 0;
     uint8_t localHwAddress[6];
     uint8_t localIpAddress[4];
     getEtherMacAddress(localHwAddress);
@@ -498,13 +544,23 @@ void sendTcpResponse(etherHeader* ether, socket* s, uint16_t flags){
     tcp->acknowledgementNumber = htonl(s->acknowledgementNumber);
     tcp->windowSize = htons(WINDOW_SIZE);
     tcp->urgentPointer = 0;
-    i = 0;
-    uint16_t mss = 1280;
-    tcp->data[i++] = 2;
-    tcp->data[i++] = 4;
-    tcp->data[i++] = (uint8_t)(mss >> 8);
-    tcp->data[i++] = (uint8_t)(mss & 0xF);
-    tcpLength = sizeof(tcpHeader) + i;
+    // TCP Options
+    if (flags & SYN) {
+        uint8_t optionData[TCP_MAX_OPTION_LENGTH];
+        // Max Segment Size - 2
+        i = 0;
+        optionData[i++] = (uint8_t)(MAX_SEGMENT_SIZE >> 8);
+        optionData[i++] = (uint8_t)(MAX_SEGMENT_SIZE & 0xFF);
+        addTcpOption(tcp->data, TCP_OPTION_MAX_SEGMENT_SIZE, 4, optionData, &options_length);
+        // No Op - 1
+        addTcpOption(NULL, TCP_OPTION_NO_OP, 0, 0, &options_length);
+        // No Op - 1
+        addTcpOption(NULL, TCP_OPTION_NO_OP, 0, 0, &options_length);
+        // SACK Permitted - 4
+        addTcpOption(NULL, TCP_OPTION_SACK_PERMITTED, 2, 0, &options_length);
+    }
+    // Length & Checksum Calculation
+    tcpLength = sizeof(tcpHeader) + options_length;
     tcp->offsetFields = htons(((((uint16_t)(tcpLength/4)) & 0xF) << 12) | flags);
     ip->length = htons(ipHeaderLength + tcpLength);
 
@@ -554,7 +610,7 @@ void sendTcpMessage(etherHeader* ether, socket* s, uint16_t flags, uint8_t data[
     tcp->destPort = htons(s->remotePort);
     tcp->sequenceNumber = htonl(s->sequenceNumber);
     tcp->acknowledgementNumber = htonl(s->acknowledgementNumber);
-    tcp->windowSize = htons(2048);
+    tcp->windowSize = htons(WINDOW_SIZE);
     tcp->urgentPointer = 0;
     tcpLength = sizeof(tcpHeader) + dataSize;
     tcp->offsetFields = htons(((((uint16_t)(sizeof(tcpHeader)/4)) & 0xF) << 12) | flags);

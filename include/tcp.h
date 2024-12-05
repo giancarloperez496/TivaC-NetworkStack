@@ -58,16 +58,28 @@ typedef struct _tcpHeader // 20 or more bytes
 #define TCP_TIME_WAIT 10
 
 // TCP offset/flags
-#define FIN 0x0001
-#define SYN 0x0002
-#define RST 0x0004
-#define PSH 0x0008
-#define ACK 0x0010
-#define URG 0x0020
-#define ECE 0x0040
-#define CWR 0x0080
-#define NS  0x0100
+#define FIN 0b00000001
+#define SYN 0b00000010
+#define RST 0b00000100
+#define PSH 0b00001000
+#define ACK 0b00010000
+#define URG 0b00100000
+#define ECE 0b01000000
+#define CWR 0b10000000
+#define NS  0x100
 #define OFS_SHIFT 12
+
+// TCP Options
+#define TCP_OPTION_NO_OP 1
+#define TCP_OPTION_MAX_SEGMENT_SIZE 2
+#define TCP_OPTION_WINDOW_SCALE 3
+#define TCP_OPTION_SACK_PERMITTED 4
+
+#define TCP_MAX_OPTION_LENGTH 50
+
+// Config
+#define MAX_SEGMENT_SIZE 1460
+#define WINDOW_SIZE 1284
 
 //-----------------------------------------------------------------------------
 // Subroutines
@@ -90,9 +102,10 @@ void processTcpArpResponse(etherHeader *ether);
 
 tcpHeader* getTcpHeader(etherHeader* ether);
 uint8_t* getTcpData(etherHeader* ether);
+uint16_t getTcpDataLength(etherHeader* ether);
 void pendTcpResponse(socket* s, uint8_t flags);
 void openTcpConnection(etherHeader* ether, socket* s);
-void completeTcpConnection(etherHeader* ether, socket* s);
+void completeTcpConCallback(etherHeader* ether, socket* s);
 void closeTcpConnection(etherHeader* ether, socket* s);
 
 void processTcpResponse(etherHeader* ether);

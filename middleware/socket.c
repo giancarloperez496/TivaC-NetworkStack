@@ -130,8 +130,15 @@ void socketConnectTcp(socket* s, uint8_t serverIp[4], uint16_t port) {
 }
 
 void socketSendTcp(socket* s, uint8_t* data, uint16_t length) {
-
+    uint8_t buffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)buffer;
+    //updateSeqNum(s, ether)
+    //memcpy(s->tx_buffer, data, length);
+    //s->tx_size = length;
+    sendTcpMessage(ether, s, PSH | ACK, data, length);
+    s->sequenceNumber += length;
 }
+//void sendTcpMessage(etherHeader* ether, socket* s, uint16_t flags, uint8_t data[], uint16_t dataSize)
 
 uint16_t socketRecvTcp(socket* s, uint8_t* buf) {
 

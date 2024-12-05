@@ -1,20 +1,17 @@
-// MQTT Library (framework only)
-// Giancarlo Perez
+/******************************************************************************
+ * File:        mqtt.c
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/2/24
+ *
+ * Description: -
+ ******************************************************************************/
 
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
 
-// Target Platform: - EK-TM4C123GXL
-// Target uC:       - TM4C123GH6PM
-// System Clock:    - 40MHz
-
-// Hardware configuration:
-// -
-
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
 #include <stdio.h>
 #include <string.h>
@@ -25,13 +22,22 @@
 #include "strlib.h"
 
 
-// ------------------------------------------------------------------------------
-//  Globals
-// ------------------------------------------------------------------------------
+//=============================================================================
+// DEFINES AND MACROS
+//=============================================================================
+
+/* Configurations */
+#define QOS 1
+#define MAX_CONNECT_RETRIES 2
+
+//=============================================================================
+// TYPEDEFS AND STRUCTURES
+//=============================================================================
 
 /*
 typedef struct _mqttClient {
-    socket* mqttSocket;
+    char clientId[MAX_CLIENT_ID_LENGTH];
+    socket* socket;
     uint8_t state;
     uint8_t tx_buf[MAX_MQTT_DATA_SIZE];
     uint16_t tx_size;
@@ -39,74 +45,44 @@ typedef struct _mqttClient {
     uint16_t rx_size;
     char mqttTopics[MAX_TOPICS][MAX_TOPIC_LENGTH];
     uint16_t topicCount;
+    uint8_t timeoutTimer;
     uint8_t flags;
 } mqttClient;
-/
- * flags
- * 1 - isTcpConnected   -MARK THIS WHILE TCP CONNECTION IS ESTABLISHED
- * 2 - isTxReady
- * 3 - isRxReady
- * 4 - isInitReady      -MARK THIS WHEN TCP CONNECTION NEEDS TO BE ESTABLISHED
- */
-
-#define MAX_CONNECT_RETRIES 2
-
-//we are assuming mqclient is a singleton and only one instance can run on this device. functions shall not take parameters as they will modify this singleton
-mqttClient mqclient[1]; //# of MQTT instances, if i want to have more functions NEED to take a client param
-uint8_t mqttBuffer[256];
-char out[50];
+*/
 
 //if i want to make mqttclient a singleton of some sort, i can define it in here and just use it all as a global instead of function parameters, similar to dhcp
+//we are assuming client is a singleton and only one instance can run on this device. functions shall not take parameters as they will modify this singleton
 
-// ------------------------------------------------------------------------------
-//  Structures
-// ------------------------------------------------------------------------------
+/* Globals */
+static mqttClient client[1];
+uint8_t mqttBuffer[MAX_MQTT_PACKET_SIZE];
+char out[MAX_UART_OUT];
 
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
+/* Forward Declarations */
+static void mqttConnectTimeout(void* context);
+static uint8_t encodeLength(uint8_t* out, uint32_t i);
+static void mqttConnectTimeout(void* context);
+static void socketErrorCallback(void* context);
+static void mqttErrorCallback(void* context);
+static void mqttRetryConnection();
 
-/*mqttClient* getMqttClient() { //should not rly be a need for this function UNLESS Im running multiple MQTT instances
-    return mqclient;
-}*/
-
-void setMqttState(uint8_t state) { //setMqttClientState()
-    mqclient->state = state;
-}
-
-uint8_t getMqttState() {
-    return mqclient->state;
-}
-
-uint8_t getMqttQos() {
-    return QOS;
-}
-
-void initMqtt() {
-    setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
-}
-
-uint8_t timeoutTimer;
-
-/*void resetMqtt() {
-    setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
-    deleteSocket(mqclient.socket);
-}*/
+//=============================================================================
+// MAIN FUNCTION
+//=============================================================================
 
 //main client loop
 void runMqttClient() { //extern these maybe?
-    socket* mqsocket = mqclient->socket;
+    socket* mqttSocket = client->socket;
     uint8_t mqttState = getMqttState();
-    uint8_t tcpState = getTcpState(mqsocket);
+    uint8_t tcpState = getTcpState(mqttSocket);
     //handleTransition();
     switch (mqttState) {
     case MQTT_CLIENT_STATE_DISCONNECTED:
         break;
     case MQTT_CLIENT_STATE_TCP_CONNECTING:
-        //lowkey need a better way to check if the socket is ready, either by callback or something?
+        //lowkey need a better way to check if the socket is ready, usually by callback or blocking fn or flag, this should work for this purpose tho
         /*
          * onTcpEstablished(socket) {
-
         */
         if (tcpState == TCP_ESTABLISHED) {
             putsUart0("TCP Connection established\n");
@@ -114,45 +90,73 @@ void runMqttClient() { //extern these maybe?
         }
         break;
     case MQTT_CLIENT_STATE_TCP_CONNECTED:
-        sendMqttMessage(MQTT_CONNECT);
+        //sendMqttMessage(MQTT_CONNECT);
+        sendMqttConnect(DEFAULT_KEEPALIVE, DEFAULT_CLEANSESSION, DEFAULT_WILLTOPIC, DEFAULT_WILLMSG, DEFAULT_WILLQOS, DEFAULT_WILLRETAIN);
         setMqttState(MQTT_CLIENT_STATE_MQTT_CONNECTING);
         if (MAX_CONNECT_RETRIES > 0) {
-            //timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
+            client->timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
         }
         break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTING:
-        //handle CONNACK in callback or something
-        //check if timeout? if timeout expired go back to TCP connected, basically what i said above, can either use startTimer or millis()
+        //handle CONNACK in processMqttData
         if (tcpState == TCP_CLOSE_WAIT) {
             disconnectMqtt();
-            //setMqttState(MQTT_CLIENT_STATE_DISCONNECTING);
-            //socketCloseTcp(mqsocket);
         }
         break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
+
+
         if (tcpState == TCP_CLOSE_WAIT) {
-            //setMqttState(MQTT_CLIENT_STATE_DISCONNECTING);
-            //socketCloseTcp(mqsocket);
             disconnectMqtt();
         }
         break;
     case MQTT_CLIENT_STATE_DISCONNECTING:
+
+
         if (tcpState == TCP_CLOSED) {
+            stopTimer(client->timeoutTimer);
             setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
-            //deleteSocket(mqsocket);
+            putsUart0("Disconnected from MQTT Broker\n");
+            //deleteSocket(mqttSocket);
             //how do we know that the socket finished closing?
             //if !s.valid?
             //checking state may be iffy
             //callback?
         }
         break;
-
     }
+}
+
+//=============================================================================
+// STATIC FUNCTIONS
+//=============================================================================
+
+static uint8_t encodeLength(uint8_t* out, uint32_t i) {
+    uint8_t byte;
+    uint8_t lenlen = 0;;
+    do {
+        byte = i % 128;
+        i /= 128;
+        if (i > 0) {
+            byte |= 0x80;
+        }
+        out[lenlen++] = byte;
+    } while (i > 0);
+    return lenlen;
+}
+
+static void mqttConnectTimeout(void* context) {
+    //if state == connecting else ignore??
+    mqttError err;
+    err.errorCode = MQTT_ERROR_CONNECT_TIMEOUT;
+    //call connectMqtt() again as needed
+    str_copy(err.errorMsg, "Timed out waiting for MQTT Connect from broker.\n");
+    mqttErrorCallback(&err);
 }
 
 //Application level error handler, application can handle Layer 4 errors here
 //Layer 4 calls this function
-void socketErrorCallback(void* context) {
+static void socketErrorCallback(void* context) {
     socketError* err = (socketError*)context;
     //if i want to retry TCP connections, i can call connectMqtt() again
     switch (err->errorCode) {
@@ -166,33 +170,23 @@ void socketErrorCallback(void* context) {
     }
     deleteSocket(err->sk);
     putsUart0(err->errorMsg);
-    //err->sk should ALWAYS be the same as mqclient->socket
+    //err->sk should ALWAYS be the same as client->socket
 }
 
 //Application error handler, application will handle Layer 7 errors here
 //Layer 7 calls this function
-void mqttErrorCallback(void* context) {
+static void mqttErrorCallback(void* context) {
     mqttError* err = (mqttError*)context;
+    putsUart0(err->errorMsg);
     switch(err->errorCode) {
     //MQTT layer errors
     case MQTT_ERROR_CONNECT_TIMEOUT:
         mqttRetryConnection();
         break;
     }
-    putsUart0(err->errorMsg);
 }
 
-
-void mqttConnectTimeout(void* context) {
-    //if state == connecting else ignore??
-    mqttError err;
-    err.errorCode = MQTT_ERROR_CONNECT_TIMEOUT;
-    //call connectMqtt() again as needed
-    str_copy(err.errorMsg, "Timed out waiting for MQTT Connect from broker.\n");
-    mqttErrorCallback(&err);
-}
-
-void mqttRetryConnection() {
+static void mqttRetryConnection() {
     static uint8_t attempts = 0;
     uint8_t mqstate = getMqttState();
     if (mqstate == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
@@ -200,19 +194,50 @@ void mqttRetryConnection() {
         if (attempts == MAX_CONNECT_RETRIES) {
             putsUart0("Reached max number of attempts to connect to broker; resetting connection...\n");
             attempts = 0;
-            //socketCloseTcp(mqclient->socket);
-            //setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
             disconnectMqtt();
         }
         else {
-            //putsUart0("Retrying connection to MQTT Broker...\n");
-            //timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
+            putsUart0("Retrying connection to MQTT Broker...\n");
+            client->timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
         }
     }
     else {
         //timer should be stopped when this function is called and should not restart
     }
 }
+
+//=============================================================================
+// PUBLIC FUNCTIONS
+//=============================================================================
+
+/* Setters & Getters */
+mqttHeader* getMqttHeader(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    uint32_t pllength = ntohs(ip->length) - (ip->size * 4) - ((ntohs(tcp->offsetFields) >> 12) * 4);
+    uint8_t* tcpData = tcp->data;
+    mqttHeader* mqtt = (mqttHeader*)tcpData;
+    return mqtt;
+}
+
+inline void setMqttState(uint8_t state) {
+    client->state = state;
+}
+
+inline uint8_t getMqttState() {
+    return client->state;
+}
+
+inline uint8_t getMqttResponse(mqttHeader* mqtt) {
+    return mqtt->flags >> 4;
+}
+
+
+/* MQTT Specific Functions */
+void initMqtt() {
+    setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
+}
+
 
 //connects to MQTT server stored in device on port 1883
 //starts with TCP connection
@@ -222,39 +247,37 @@ void connectMqtt() {
     uint8_t mqserv[4];
     switch (mqttState) {
     case MQTT_CLIENT_STATE_DISCONNECTED:
-        mqclient->socket = newSocket();
-        mqclient->socket->errorCallback = socketErrorCallback;
+        client->socket = newSocket();
+        client->socket->errorCallback = socketErrorCallback;
         getIpMqttBrokerAddress(mqserv);
         snprintf(out, 50, "Connecting to MQTT server %d.%d.%d.%d:%d\n", mqserv[0], mqserv[1], mqserv[2], mqserv[3], MQTT_PORT);
         putsUart0(out);
-        socketConnectTcp(mqclient->socket, mqserv, MQTT_PORT);
+        socketConnectTcp(client->socket, mqserv, MQTT_PORT);
         setMqttState(MQTT_CLIENT_STATE_TCP_CONNECTING);
         break;
     default:
-
         break;
     }
 }
-
 
 void disconnectMqtt() {
     uint8_t mqttState = getMqttState();
     switch (mqttState) {
     case MQTT_CLIENT_STATE_DISCONNECTED:
         //do nothing, client already disconnected
-        break;
+        return;
     case MQTT_CLIENT_STATE_TCP_CONNECTING:
         //never got SYN ACK, should be handled by socketErrorCallback
         break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTING:
         //never got CONNACK, client wants to close connection
-        sendMqttMessage(MQTT_DISCONNECT);
-        socketCloseTcp(mqclient->socket);
+        //sendMqttDisconnect();
+        socketCloseTcp(client->socket);
         break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
         //got CONNACK, client wants to close connection
-        sendMqttMessage(MQTT_DISCONNECT);
-        socketCloseTcp(mqclient->socket);
+        sendMqttDisconnect();
+        socketCloseTcp(client->socket);
         break;
     default:
         break;
@@ -268,9 +291,9 @@ void setMqttTopics(char** topics, uint32_t count) {
     if (count <= MAX_TOPICS) {
         for (i = 0; i < count; i++) {
             for (j = 0; topics[i][j] != '\0' && j < MAX_TOPIC_LENGTH - 1; j++) {
-                mqclient->mqttTopics[i][j] = topics[i][j];
+                client->mqttTopics[i][j] = topics[i][j];
             }
-            mqclient->mqttTopics[i][j] = '\0';
+            client->mqttTopics[i][j] = '\0';
         }
     }
 }
@@ -278,8 +301,8 @@ void setMqttTopics(char** topics, uint32_t count) {
 void getMqttTopics(char** input, uint32_t* count) {
     uint32_t i;
     for (i = 0; i < MAX_TOPICS; i++) {
-        input[i] = mqclient->mqttTopics[i];
-        if (mqclient->mqttTopics[i][0] == '\0') {
+        input[i] = client->mqttTopics[i];
+        if (client->mqttTopics[i][0] == '\0') {
             *count = i;
             break;
         }
@@ -295,14 +318,7 @@ bool isMqttResponse(etherHeader* ether) {
     return ok;
 }
 
-mqttHeader* getMqttPacket(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    uint32_t pllength = ntohs(ip->length) - (ip->size * 4) - ((ntohs(tcp->offsetFields) >> 12) * 4);
-    uint8_t* tcpData = tcp->data;
-    mqttHeader* mqtt = (mqttHeader*)tcpData;
-    return mqtt;
-}
+
 
 /*void pingRespMqtt() {
     uint32_t i = 0;
@@ -326,19 +342,6 @@ mqttHeader* getMqttPacket(etherHeader* ether) {
     }
 }*/
 
-uint8_t encodeLength(uint8_t* out, uint32_t i) {
-    uint8_t byte;
-    uint8_t lenlen = 0;;
-    do {
-        byte = i % 128;
-        i /= 128;
-        if (i > 0) {
-            byte |= 0x80;
-        }
-        out[lenlen++] = byte;
-    } while (i > 0);
-    return lenlen;
-}
 
 
 // returns return code
@@ -419,7 +422,11 @@ uint8_t encodeLength(uint8_t* out, uint32_t i) {
     }*/
 
 void publishMqtt(char strTopic[], char strData[]) {
-    sendMqttMessage();
+
+    uint8_t mqttState = getMqttState();
+    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
+
+    }
     /*etherHeader* ether = (etherHeader*)etherbuffer;
     socket* s = getMqttSocket();
     if (s) {
@@ -494,135 +501,60 @@ void processMqttPublish(mqttHeader* mqtt, uint8_t* topicIndex, char* command) {
         if( strcmp( command, mqttTopics[0] ) )          // "uta/ir/address"
             *topicIndex = 0;
         else if( strcmp( command, mqttTopics[5] ) )     // "uta/ir/channel"
-            *topicIndex = 5;
-    }
-    else if( topicLen == strlen( mqttTopics[1] ) )
-    {
-        if( strcmp( command, mqttTopics[1] ) )          // "uta/ir/data"
-            *topicIndex = 1;
-    }
-    else if( topicLen == strlen( mqttTopics[2] ) )
-    {
-        if( strcmp( command, mqttTopics[2] ) )          // "uta/ir/vol_up"
-            *topicIndex = 2;
-        else if( strcmp( command, mqttTopics[6] ) )     // "uta/ir/source"
-            *topicIndex = 6;
-    }
-    else if( topicLen == strlen( mqttTopics[3] ) )
-    {
-        if( strcmp( command, mqttTopics[3] ) )          // "uta/ir/vol_down"
-            *topicIndex = 3;
-    }
-    else if( topicLen == strlen( mqttTopics[4] ) )
-    {
-        if( strcmp( command, mqttTopics[4] ) )          // "uta/ir/power_toggle"
-            *topicIndex = 4;
-    }
-    else
-        *topicIndex = mqttConnection.topicCount;*/
+            *topicIndex = 5;*/
 }
 
 void processMqttData(etherHeader* ether) {
-    mqttHeader* mqtt = getMqttPacket(ether);
-    uint8_t responseType = mqtt->flags >> 4;
-    /*uint16_t mqttState = getMqttState();
-    uint8_t qos = getMqttQos();
-    if (mqttState == MQTT_STATE_CONNECTING) {
+    mqttHeader* mqtt = getMqttHeader(ether);
+    uint8_t responseType = getMqttResponse(mqtt);
+    uint16_t mqttState = getMqttState();
+    snprintf(out, MAX_UART_OUT, "Received MQTT data:\n %s\n", mqtt->data);
+    putsUart0(out);
+    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
         switch (responseType) {
         case MQTT_CONNACK:
-            mqttState = MQTT_STATE_CONNECTED;
+            setMqttState(MQTT_CLIENT_STATE_MQTT_CONNECTED);
+            putsUart0("Connected to MQTT Broker\n");
             break;
         }
     }
-    else if ( mqttState == MQTT_STATE_CONNECTED )
-    {
-        uint8_t topicIndex;
-        char command[15];
-
+    else if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTED) {
         switch ( responseType ) {
-            case MQTT_PUBLISH:
-                processMqttPublish( mqtt, &topicIndex, command );
-                switch(topicIndex) {
-                    case 0: //topic 0
-                        //topic0callback();
-                        break;
-                    case 1:                     // "uta/ir/data"
-                        break;
-                    case 2:                     // "uta/ir/vol_up"
-                        break;
-                    case 3:                     // "uta/ir/vol_down"
-                        break;
-                    case 4:                     // "uta/ir/power_toggle"
-                        break;
-                    case 5:                     // "uta/ir/channel"
-                        break;
-                    case 6:                     // "uta/ir/source"
-                        break;
-                    default:
-                        break;
-                }
-                break;
-            case MQTT_PUBACK:
-                if (qos == 1) {
+        case MQTT_PUBLISH:
 
-                }
-                break;
-            case MQTT_SUBACK:
+            break;
+        case MQTT_PUBACK:
 
-                break;
-            case MQTT_UNSUBACK:
+            break;
+        case MQTT_SUBACK:
 
-                break;
-            case MQTT_PINGREQ:
-                //pingRespMqtt();
-                break;
-            }
+            break;
+        case MQTT_UNSUBACK:
+
+            break;
+        case MQTT_PINGREQ:
+            //pingRespMqtt();
+            break;
+        }
     }
-    //if etherHeader == MQTT_CONNECT*/
+    else {
+        //we only care about packets if we're connecting or connected
+    }
 }
 
 
 void subscribeMqtt(char strTopic[]) {
-    /*etherHeader* ether = (etherHeader*)etherbuffer;
-    socket* s = getMqttSocket();
-    if (s) {
-        uint32_t i = 0;
-        mqttHeader* mqtt = (mqttHeader*)mqttbuffer;
-        mqtt->flags = (MQTT_SUBSCRIBE << 4) | 0b0010;
-        mqtt->data[i++] = 0;
-        uint16_t packetId = 10;
-        mqtt->data[i++] = packetId >> 8;
-        mqtt->data[i++] = packetId & 0xFF;
-        size_t topicLen = str_length((char*)strTopic);
-        mqtt->data[i++] = topicLen >> 8;
-        mqtt->data[i++] = topicLen & 0xFF;
-        uint32_t o;
-        for (o = 0; o < topicLen; o++) {
-            mqtt->data[i++] = strTopic[o];
-        }
-        mqtt->data[i++] = 0x01;
-        uint8_t tmplen[4];
-        uint8_t lenlen = encodeLength(tmplen, i);
-        uint32_t p;
-        for (p = 1; p < i + lenlen - 1; p++) {
-            mqtt->data[p + lenlen - 1] = mqtt->data[p];
-        }
-        for (p = 0; p < lenlen; p++) {
-            mqtt->data[p] = tmplen[p];
-        }
-        mqtt->data[0] = i-1;
-        uint16_t dataLength;
-        uint8_t state = getMqttState();
-        switch (state) {
-        case MQTT_STATE_CONNECTED:
-            dataLength = i+1;
-            sendTcpMessage(ether, s, PSH | ACK, (uint8_t*)mqtt, dataLength);
-            break;
-        }
-    }*/
+    uint8_t mqttState = getMqttState();
+    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
+
+    }
 }
 
 void unsubscribeMqtt(char strTopic[]) {
+    uint8_t mqttState = getMqttState();
+    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
+
+    }
     /*etherHeader* ether = (etherHeader*)etherbuffer;
     socket* s = getMqttSocket();
     if (s) {
@@ -662,18 +594,165 @@ void unsubscribeMqtt(char strTopic[]) {
     }*/
 }
 
-void sendMqttMessage(uint8_t msg) {
+void sendMqttConnect(uint16_t keepAlive, bool cleanSession, const char* willTopic, const char* willMsg, uint8_t willQoS, bool willRetain) {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+    //in the future maybe make functions to add these fields, like in DHCP & TCP
+    uint16_t i = 0; //uint8 should suffice
+    mqtt->flags = (MQTT_CONNECT << 4) | 0b0000;
+    mqtt->data[i++] = 0;
+    mqtt->data[i++] = 4 >> 8;
+    mqtt->data[i++] = 4 & 0xFF;
+    mqtt->data[i++] = 'M';
+    mqtt->data[i++] = 'Q';
+    mqtt->data[i++] = 'T';
+    mqtt->data[i++] = 'T';
+    mqtt->data[i++] = 0x04;
+    mqtt->data[i] = 0;
+    mqtt->data[i++] = MQTT_FLAG_CLEANSESSION | (QOS << 3);
+    mqtt->data[i++] = 60 >> 8;
+    mqtt->data[i++] = 60 & 0xFF;
+    mqtt->data[i++] = 2 >> 8;
+    mqtt->data[i++] = 2 & 0xFF;
+    mqtt->data[i++] = 'G';
+    mqtt->data[i++] = 'P';
+    uint8_t tmplen[4];
+    uint8_t lenlen = encodeLength(tmplen, i);
+    uint32_t p;
+    for (p = 1; p < i + lenlen - 1; p++) {
+        mqtt->data[p + lenlen - 1] = mqtt->data[p];
+    }
+    for (p = 0; p < lenlen; p++) {
+        mqtt->data[p] = tmplen[p];
+    }
+    mqtt->data[0] = i-1; //LENGTH IS BEING CALCULATED INCORRECTLY, LOOK AT THIS LATER
+    uint16_t dataLength = i + 1;
+    socketSendTcp(client->socket, (uint8_t*)mqtt, dataLength);
+}
+
+void sendMqttConnack() {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+
+}
+
+void sendMqttPublish() {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+
+}
+
+void sendMqttPubAck() {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+
+}
+
+void sendMqttPubRec() {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+
+}
+
+void sendMqttPubComp() {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+
+}
+
+void sendMqttSubscribe(char strTopic[]) {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+    uint32_t i = 0;
+    mqtt->flags = (MQTT_SUBSCRIBE << 4) | 0b0010;
+    mqtt->data[i++] = 0;
+    uint16_t packetId = 10;
+    mqtt->data[i++] = packetId >> 8;
+    mqtt->data[i++] = packetId & 0xFF;
+    size_t topicLen = str_length((char*)strTopic);
+    mqtt->data[i++] = topicLen >> 8;
+    mqtt->data[i++] = topicLen & 0xFF;
+    uint32_t o;
+    for (o = 0; o < topicLen; o++) {
+        mqtt->data[i++] = strTopic[o];
+    }
+    mqtt->data[i++] = 0x01;
+    uint8_t tmplen[4];
+    uint8_t lenlen = encodeLength(tmplen, i);
+    uint32_t p;
+    for (p = 1; p < i + lenlen - 1; p++) {
+        mqtt->data[p + lenlen - 1] = mqtt->data[p];
+    }
+    for (p = 0; p < lenlen; p++) {
+        mqtt->data[p] = tmplen[p];
+    }
+    mqtt->data[0] = i-1;
+    uint16_t dataLength;
+    dataLength = i+1;
+    sendTcpMessage(ether, client->socket, PSH | ACK, (uint8_t*)mqtt, dataLength);
+}
+
+void sendMqttSubAck() {
+
+}
+
+void sendMqttUnsubscribe() {
+
+}
+
+void sendMqttUnsubAck() {
+
+}
+
+void sendMqttPingReq() {
+
+}
+
+void sendMqttPingResp() {
+
+}
+
+void sendMqttDisconnect() {
+    uint8_t etherBuffer[MAX_PACKET_SIZE];
+    etherHeader* ether = (etherHeader*)etherBuffer;
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+    uint8_t i = 0;
+    mqtt->flags = (MQTT_DISCONNECT << 4) | 0;    // disconnect flag
+    mqtt->data[i++] = 0;              // no length
+    uint16_t dataLength;
+    dataLength = i+1;
+    socketSendTcp(client->socket, mqtt, dataLength);
+    //sendTcpMessage(ether, client->socket, PSH | ACK, (uint8_t*)mqtt, dataLength);
+}
+
+
+
+/*
+ * sendMqttMessage(MQTT_CONNECT, NULL, NULL, NULL);
+ * sendMqttMessage(MQTT_CONNACK, NULL, NULL, NULL);
+ * if NULL use ? to set defaults
+ */
+/*void sendMqttMessage(uint8_t msgType, mqttMsg m) {
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
     uint16_t len = 4;
     mqtt->flags = (msg << 4) | 0b0010;
-    /*switch (msg) {
+    switch (msg) {
     case MQTT_CONNECT:
+        mqttConnect* msg = (mqttConnect*)(m.msgInfo);
 
         break;
     case MQTT_CONNACK:
-
+        mqttConnect* msg = (mqttConnect*)(m.msgInfo);
         break;
 
-    }*/
-    socketSendTcp(mqclient->socket, mqtt, len);
-}
+    }
+    socketSendTcp(client->socket, mqtt, len);
+}*/
+

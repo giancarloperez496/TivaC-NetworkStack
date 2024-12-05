@@ -1,16 +1,12 @@
 /******************************************************************************
- * @file        strlib.c
- * @author      Giancarlo Perez
- * @date        11/26/24
- * @version     1.0
- * @brief       Simple string library
+ * File:        strlib.c
  *
- * @copyright   2024 Giancarlo Perez
- *              All rights reserved.
+ * Author:      Giancarlo Perez
  *
- * @details     -
+ * Created:     12/2/24
  *
- *****************************************************************************/
+ * Description: -
+ ******************************************************************************/
 
 #include "strlib.h"
 #include <stdbool.h>

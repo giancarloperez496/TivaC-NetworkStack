@@ -1,29 +1,29 @@
-// MQTT Library (framework only)
-// Jason Losh
-
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
-
-// Target Platform: -
-// Target uC:       -
-// System Clock:    -
-
-// Hardware configuration:
-// -
-
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
+/******************************************************************************
+ * File:        mqtt.h
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/2/24
+ *
+ * Description: -
+ ******************************************************************************/
 
 #ifndef MQTT_H_
 #define MQTT_H_
+
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
 #include "tcp.h"
 #include <stdint.h>
 #include <stdbool.h>
 
+//=============================================================================
+// DEFINES AND MACROS
+//=============================================================================
 
+/* MQTT Message Types */
 #define MQTT_CONNECT 1
 #define MQTT_CONNACK 2
 #define MQTT_PUBLISH 3
@@ -40,15 +40,13 @@
 #define MQTT_DISCONNECT 14
 #define MQTT_AUTH 15
 
-#define MQTT_STATE_DISCONNECTED 0
-#define MQTT_STATE_CONNECTING 1
-#define MQTT_STATE_CONNECTED 2
-#define MQTT_STATE_DISCONNECTING 3
-
+/* MQTT QoS Types */
 #define QOS_0 0
 #define QOS_1 1
 #define QOS_2 2
 #define QOS_3 3
+
+/* MQTT Flags */
 #define MQTT_FLAG_USERNAME 0x80
 #define MQTT_FLAG_PASSWORD 0x40
 #define MQTT_FLAG_WILLRETAIN 0x20
@@ -59,39 +57,44 @@
 #define MQTT_FLAG_WILL 0x04
 #define MQTT_FLAG_CLEANSESSION 0x02
 
+/* MQTT Client Error Types */
 #define MQTT_OK 0
-#define MQTT_CONNECT_ERROR_INVALID_SOCKET 1
-#define MQTT_CONNECT_ERROR_INVALID_STATE 2
+#define MQTT_ERROR_CONNECT_INVALID_SOCKET 1
+#define MQTT_ERROR_CONNECT_INVALID_STATE 2
+#define MQTT_ERROR_CONNECT_TIMEOUT 3
 
-#define MQTT_PORT 1883
 
- //Bit 7 : Username     Bit 6 : Password     Bit 5 : Will Retain
-    // Bit 4:3 QoS Lvl     Bit 2 : Will Flag       Bit 1 : Clean Session
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
-
-#define MAX_TOPICS 8
-#define MAX_TOPIC_LENGTH 30
-#define QOS 1
-
-#define MAX_MQTT_DATA_SIZE 50
-
-#define MQTT_CLIENT_TCP_CONNECTED   0b00000001
-#define MQTT_CLIENT_TX_READY        0b00000010
-#define MQTT_CLIENT_RX_READY        0b00000100
-#define MQTT_CLIENT_RUNNING         0b00001000
-
+/* MQTT Client States */
 #define MQTT_CLIENT_STATE_DISCONNECTED 0
 #define MQTT_CLIENT_STATE_INIT 1
 #define MQTT_CLIENT_STATE_TCP_CONNECTING 2
 #define MQTT_CLIENT_STATE_TCP_CONNECTED 3
 #define MQTT_CLIENT_STATE_MQTT_CONNECTING 4
-#define MQTT_CLIENT_STATE_MQTT_WAITFORCONNACK 5
-#define MQTT_CLIENT_STATE_MQTT_CONNECTED 6
-#define MQTT_CLIENT_STATE_DISCONNECTING 7
+#define MQTT_CLIENT_STATE_MQTT_CONNECTED 5
+#define MQTT_CLIENT_STATE_DISCONNECTING 6
 
-#define MQTT_CLOSING 255;
+/* MQTT Default Send Parameters */
+      //MQTT_CONNECT_
+#define DEFAULT_KEEPALIVE 0
+#define DEFAULT_CLEANSESSION 0
+#define DEFAULT_WILLTOPIC NULL
+#define DEFAULT_WILLMSG NULL
+#define DEFAULT_WILLQOS 0
+#define DEFAULT_WILLRETAIN 0
+
+
+/* Constants */
+#define MQTT_PORT 1883
+
+#define MAX_CLIENT_ID_LENGTH 20
+#define MAX_TOPICS 8
+#define MAX_TOPIC_LENGTH 30
+#define MAX_MQTT_DATA_SIZE 50
+#define MAX_MQTT_PACKET_SIZE 256
+
+//=============================================================================
+// TYPEDEFS AND STRUCTURES
+//=============================================================================
 
 typedef struct _mqttHeader {// 20 or more bytes
     uint8_t flags; //4bits packet type - 4 bits flags
@@ -99,6 +102,7 @@ typedef struct _mqttHeader {// 20 or more bytes
 } mqttHeader;
 
 typedef struct _mqttClient {
+    char clientId[MAX_CLIENT_ID_LENGTH];
     socket* socket;
     uint8_t state;
     uint8_t tx_buf[MAX_MQTT_DATA_SIZE];
@@ -107,6 +111,7 @@ typedef struct _mqttClient {
     uint16_t rx_size;
     char mqttTopics[MAX_TOPICS][MAX_TOPIC_LENGTH];
     uint16_t topicCount;
+    uint8_t timeoutTimer;
     uint8_t flags;
 } mqttClient;
 
@@ -116,33 +121,39 @@ typedef struct mqttError {
     char errorMsg[SOCKET_ERROR_MAX_MSG_LEN];
 } mqttError;
 
-#define MQTT_ERROR_CONNECT_TIMEOUT 1
-/*
- * 1 - isTcpConnected
- * 2 - isTxReady
- * 3 - isRxReady
- * 4 - isRunning
- */
+//=============================================================================
+// FUNCTION PROTOTYPES
+//=============================================================================
 
-uint32_t getStrLength(char* str);
-void setMqttSocket(socket*);
-socket* getMqttSocket();
+mqttHeader* getMqttHeader(etherHeader* ether);
+void setMqttState(uint8_t state);
+uint8_t getMqttState();
 void initMqtt();
 void runMqttClient();
 void processMqttData(etherHeader* ether);
 void processMqttPublish(mqttHeader* mqtt, uint8_t* topicIndex, char* command);
 void connectMqtt();
 void disconnectMqtt();
-void mqttRetryConnection();
-void mqttErrorCallback(void* context);
-uint8_t encodeLength(uint8_t* out, uint32_t i);
 void publishMqtt(char strTopic[], char strData[]);
 void subscribeMqtt(char strTopic[]);
 void unsubscribeMqtt(char strTopic[]);
-void setMqttState( uint8_t state);
-void sendMqttMessage(uint8_t msg);
-uint8_t getMqttState();
-uint8_t getMqttQos();
+
+
+//void sendMqttMessage(uint8_t msg);
+
+void sendMqttConnect(uint16_t keepAlive, bool cleanSession, const char* willTopic, const char* willMsg, uint8_t willQoS, bool willRetain);
+void sendMqttConnack();
+void sendMqttPublish();
+void sendMqttPubAck();
+void sendMqttPubRec() ;
+void sendMqttPubComp();
+void sendMqttSubscribe();
+void sendMqttSubAck();
+void sendMqttUnsubscribe();
+void sendMqttUnsubAck();
+void sendMqttPingReq();
+void sendMqttPingResp();
+void sendMqttDisconnect();
 
 #endif
 

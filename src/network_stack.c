@@ -151,6 +151,11 @@ void processTcpData(etherHeader* data) {
                     }
                 }
                 else {
+                    //maybe condense into socketRstTcp or something
+                    getSocketInfoFromTcpPacket(data, &s);
+                    tcpHeader* tcp = getTcpHeader(data);
+                    s.sequenceNumber = ntohl(tcp->acknowledgementNumber);
+                    s.acknowledgementNumber = ntohl(tcp->sequenceNumber) + getTcpDataLength(data);
                     sendTcpResponse(data, &s, RST | ACK);
                 }
             }

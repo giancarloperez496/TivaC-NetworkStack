@@ -148,7 +148,8 @@ void renewIp() {
 }
 
 void renewDhcp() {
-    putsUart0("going to BOUND, starting T1, T2, leaseTimer...\n");
+    //putsUart0("going to BOUND, starting T1, T2, leaseTimer...\n");
+    putsUart0("IP address acquired\n");
     setDhcpState(DHCP_BOUND);
     setIpAddress(dhcpOfferedIpAdd);
     t1HitTimer = startOneshotTimer(callbackDhcpT1HitTimer, leaseT1, NULL);
