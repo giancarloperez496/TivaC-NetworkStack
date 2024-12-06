@@ -140,10 +140,10 @@ void socketSendTcp(socket* s, uint8_t* data, uint16_t length) {
 }
 //void sendTcpMessage(etherHeader* ether, socket* s, uint16_t flags, uint8_t data[], uint16_t dataSize)
 
-uint16_t socketRecvTcp(socket* s, uint8_t* buf) {
+/*uint16_t socketRecvTcp(socket* s, uint8_t* buf) {
 
     return 1;
-}
+}*/
 
 void socketCloseTcp(socket* s) {
     uint8_t buffer[MAX_PACKET_SIZE];

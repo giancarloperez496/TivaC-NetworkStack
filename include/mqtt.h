@@ -75,22 +75,28 @@
 
 /* MQTT Default Send Parameters */
       //MQTT_CONNECT_
-#define DEFAULT_KEEPALIVE 0
-#define DEFAULT_CLEANSESSION 0
+#define DEFAULT_KEEPALIVE 10
+#define DEFAULT_CLEANSESSION 1
 #define DEFAULT_WILLTOPIC NULL
 #define DEFAULT_WILLMSG NULL
-#define DEFAULT_WILLQOS 0
+#define DEFAULT_WILLQOS QOS_0
 #define DEFAULT_WILLRETAIN 0
 
+/* MQTT Versions */
+#define MQTT_VERSION_v3_1_1 4
 
 /* Constants */
-#define MQTT_PORT 1883
-
 #define MAX_CLIENT_ID_LENGTH 20
 #define MAX_TOPICS 8
 #define MAX_TOPIC_LENGTH 30
 #define MAX_MQTT_DATA_SIZE 50
 #define MAX_MQTT_PACKET_SIZE 256
+
+/* Config */
+#define MQTT_PORT 1883
+#define MQTT_VERSION MQTT_VERSION_v3_1_1
+#define USE_WILL 0
+
 
 //=============================================================================
 // TYPEDEFS AND STRUCTURES
@@ -101,18 +107,28 @@ typedef struct _mqttHeader {// 20 or more bytes
     uint8_t data[0];
 } mqttHeader;
 
+typedef struct _mqttOptions {
+    uint8_t version;
+    uint8_t qos;
+    uint16_t keepAlive;
+    uint8_t cleanSession;
+    uint8_t willFlag;
+    uint8_t willQos;
+    uint8_t willRetain;
+    char willTopic[MAX_TOPIC_LENGTH];
+    char willMsg[MAX_MQTT_DATA_SIZE];
+} mqttOptions;
+
 typedef struct _mqttClient {
     char clientId[MAX_CLIENT_ID_LENGTH];
     socket* socket;
     uint8_t state;
-    uint8_t tx_buf[MAX_MQTT_DATA_SIZE];
-    uint16_t tx_size;
-    uint8_t rx_buf[MAX_MQTT_DATA_SIZE];
-    uint16_t rx_size;
     char mqttTopics[MAX_TOPICS][MAX_TOPIC_LENGTH];
     uint16_t topicCount;
+    mqttOptions options;
+    //timers
     uint8_t timeoutTimer;
-    uint8_t flags;
+    uint8_t keepAliveTimer;
 } mqttClient;
 
 typedef struct mqttError {
@@ -128,6 +144,7 @@ typedef struct mqttError {
 mqttHeader* getMqttHeader(etherHeader* ether);
 void setMqttState(uint8_t state);
 uint8_t getMqttState();
+bool isMqttResponse(etherHeader* ether);
 void initMqtt();
 void runMqttClient();
 void processMqttData(etherHeader* ether);

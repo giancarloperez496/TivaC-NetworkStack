@@ -28,54 +28,11 @@
 //  Globals
 // ------------------------------------------------------------------------------
 
-//instance = idx of port #?
-//e.g
-/*
- * tcpPorts = {
- *    instance = port
- *           0 = 60000
- *           1 = 49032
- *           2 = 52403
- *           3 = 63235
- * }
- *
- *
- * tcpFsmFlags = {
- *      socket = flags
- *           0 = 00000001 - FIN needed
- *           1 = 00000010 - SYN needed
- *           2 = 00000100 -
- *           3 = 00001000
- * }
- *
- * sockets = {
- *           0 = {r_ip, r_mac, r_port, l_port, seq, ack, state}
- *           1 = {192.168.1.50, FF:FF:FF:FF:FF:FF, 53, 65031, 0, 0, CLOSED}
- * }
- *
- */
 
 // ------------------------------------------------------------------------------
 //  Structures
 // ------------------------------------------------------------------------------
 
-/*typedef struct {
-    uint8_t timerId;
-    socket* s;
-} timerSocketMap;
-
-timerSocketMap timerMap[MAX_TIMERS];
-
-socket* getSocketFromTimer(uint8_t id) {
-    uint8_t i;
-    for (i = 0; i < MAX_TIMERS; i++) {
-        if (timerMap[i].timerId == id) {
-            return timerMap[i].s;
-        }
-    }
-}
-
-*/
 
 //-----------------------------------------------------------------------------
 // Subroutines

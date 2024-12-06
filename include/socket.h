@@ -73,7 +73,7 @@ void initSocket(socket* s, uint8_t remoteIp[], uint16_t remotePort);
 socket* getSockets();
 void socketConnectTcp(socket* s, uint8_t ip[4], uint16_t port);
 void socketSendTcp(socket* s, uint8_t* data, uint16_t length);
-uint16_t socketRecvTcp(socket* s, uint8_t* buf);
+//uint16_t socketRecvTcp(socket* s, uint8_t* buf);
 void socketCloseTcp(socket* s);
 uint32_t getSocketId(socket* s);
 socket* getSocketFromLocalPort(uint16_t l_port);

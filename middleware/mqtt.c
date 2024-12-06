@@ -59,8 +59,8 @@ uint8_t mqttBuffer[MAX_MQTT_PACKET_SIZE];
 char out[MAX_UART_OUT];
 
 /* Forward Declarations */
-static void mqttConnectTimeout(void* context);
 static uint8_t encodeLength(uint8_t* out, uint32_t i);
+static void mqttKeepAliveCallback(void* context);
 static void mqttConnectTimeout(void* context);
 static void socketErrorCallback(void* context);
 static void mqttErrorCallback(void* context);
@@ -104,10 +104,11 @@ void runMqttClient() { //extern these maybe?
         }
         break;
     case MQTT_CLIENT_STATE_MQTT_CONNECTED:
-
-
+        stopTimer(client->timeoutTimer);
+        client->keepAliveTimer = startPeriodicTimer(mqttKeepAliveCallback, client->keepAlive * 0.9, NULL); //check if no other messages were sent in this time frame, if so reset timer.
         if (tcpState == TCP_CLOSE_WAIT) {
-            disconnectMqtt();
+            socketCloseTcp(client->socket);
+            //disconnectMqtt();
         }
         break;
     case MQTT_CLIENT_STATE_DISCONNECTING:
@@ -143,6 +144,11 @@ static uint8_t encodeLength(uint8_t* out, uint32_t i) {
         out[lenlen++] = byte;
     } while (i > 0);
     return lenlen;
+}
+
+static void mqttKeepAliveCallback(void* context) {
+    putsUart0("Sending MQTT Ping request");
+    //sendMqttPingReq();
 }
 
 static void mqttConnectTimeout(void* context) {
@@ -198,6 +204,7 @@ static void mqttRetryConnection() {
         }
         else {
             putsUart0("Retrying connection to MQTT Broker...\n");
+            sendMqttConnect(DEFAULT_KEEPALIVE, DEFAULT_CLEANSESSION, DEFAULT_WILLTOPIC, DEFAULT_WILLMSG, DEFAULT_WILLQOS, DEFAULT_WILLRETAIN);
             client->timeoutTimer = startOneshotTimer(mqttConnectTimeout, 10, NULL);
         }
     }
@@ -236,6 +243,14 @@ inline uint8_t getMqttResponse(mqttHeader* mqtt) {
 /* MQTT Specific Functions */
 void initMqtt() {
     setMqttState(MQTT_CLIENT_STATE_DISCONNECTED);
+    mqttOptions* opt = &client->options;
+    str_copy(client->clientId, "TM4C123GXL");
+    opt->version = MQTT_VERSION;
+    opt->qos = DEFAULT_QOS; //in the future have this configured by command, along with all other options
+    opt->keepAlive = DEFAULT_KEEPALIVE;
+    opt->cleanSession = DEFAULT_CLEANSESSION;
+    opt->willFlag = 0; //set will flag off by default, wil be able to be changed by commands in the future
+    opt->willQos = QOS_0;
 }
 
 
@@ -314,7 +329,7 @@ void getMqttTopics(char** input, uint32_t* count) {
 bool isMqttResponse(etherHeader* ether) {
     bool ok;
     tcpHeader* tcp = getTcpHeader(ether);
-    ok = (tcp->destPort == htons(MQTT_PORT));
+    ok = (htons(tcp->sourcePort) == MQTT_PORT);
     return ok;
 }
 
@@ -422,63 +437,14 @@ bool isMqttResponse(etherHeader* ether) {
     }*/
 
 void publishMqtt(char strTopic[], char strData[]) {
-
     uint8_t mqttState = getMqttState();
-    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
-
+    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTED) {
+        sendMqttPublish(strTopic, strData);
     }
-    /*etherHeader* ether = (etherHeader*)etherbuffer;
-    socket* s = getMqttSocket();
-    if (s) {
-        uint32_t i = 0;
-        mqttHeader* mqtt = (mqttHeader*)mqttbuffer;
-        mqtt->flags = (MQTT_PUBLISH << 4) | 0b0010;
-        mqtt->data[i++] = 0;
-        if (QOS > 0) {
-            uint16_t packetId = 10;
-            mqtt->data[i++] = packetId >> 8;
-            mqtt->data[i++] = packetId & 0xFF;
-        }
-        size_t topicLen = str_length((char*)strTopic);
-        mqtt->data[i++] = topicLen >> 8;
-        mqtt->data[i++] = topicLen & 0xFF;
-        uint32_t o;
-        for (o = 0; o < topicLen; o++) {
-            mqtt->data[i++] = strTopic[o];
-        }
-        mqtt->data[i++] = 14 >> 8;
-        mqtt->data[i++] = 14 & 0xFF;
-        size_t msgLen = getStrLength((char*)strData);
-        for (o = 0; o < msgLen; o++) {
-            mqtt->data[i++] = strData[o];
-        }
-        uint8_t tmplen[4];
-        uint8_t lenlen = encodeLength(tmplen, i);
-        uint32_t p;
-        for (p = 1; p < i + lenlen - 1; p++) {
-            mqtt->data[p + lenlen - 1] = mqtt->data[p];
-        }
-        for (p = 0; p < lenlen; p++) {
-            mqtt->data[p] = tmplen[p];
-        }
-        mqtt->data[0] = i-1;
-        uint16_t dataLength;
-        uint8_t state = getMqttState();
-        switch (state) {
-        case MQTT_STATE_CONNECTED:
-            dataLength = i+1;
-            sendTcpMessage(ether, s, PSH | ACK, (uint8_t*)mqtt, dataLength);
-            break;
-        default:
-            break;
-        }
-    }
-    else {
-        return;
-    }*/
 }
 
-void processMqttPublish(mqttHeader* mqtt, uint8_t* topicIndex, char* command) {
+void processMqttPublish(etherHeader* ether, uint8_t* topicIndex, char* command) {
+    mqttHeader* mqtt = getMqttHeader(ether);
     /*uint32_t varLength;
     uint8_t byte;
     uint8_t i = 0;
@@ -508,8 +474,6 @@ void processMqttData(etherHeader* ether) {
     mqttHeader* mqtt = getMqttHeader(ether);
     uint8_t responseType = getMqttResponse(mqtt);
     uint16_t mqttState = getMqttState();
-    snprintf(out, MAX_UART_OUT, "Received MQTT data:\n %s\n", mqtt->data);
-    putsUart0(out);
     if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
         switch (responseType) {
         case MQTT_CONNACK:
@@ -519,7 +483,9 @@ void processMqttData(etherHeader* ether) {
         }
     }
     else if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTED) {
-        switch ( responseType ) {
+        snprintf(out, MAX_UART_OUT, "Received MQTT data:\n %s\n", mqtt->data);
+        putsUart0(out);
+        switch (responseType) {
         case MQTT_PUBLISH:
 
             break;
@@ -545,14 +511,14 @@ void processMqttData(etherHeader* ether) {
 
 void subscribeMqtt(char strTopic[]) {
     uint8_t mqttState = getMqttState();
-    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
+    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTED) {
 
     }
 }
 
 void unsubscribeMqtt(char strTopic[]) {
     uint8_t mqttState = getMqttState();
-    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTING) {
+    if (mqttState == MQTT_CLIENT_STATE_MQTT_CONNECTED) {
 
     }
     /*etherHeader* ether = (etherHeader*)etherbuffer;
@@ -594,29 +560,41 @@ void unsubscribeMqtt(char strTopic[]) {
     }*/
 }
 
-void sendMqttConnect(uint16_t keepAlive, bool cleanSession, const char* willTopic, const char* willMsg, uint8_t willQoS, bool willRetain) {
-    uint8_t etherBuffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)etherBuffer;
+void sendMqttConnect() {
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+    mqttOptions* opt = &client->options; //using a ptr to save space
     //in the future maybe make functions to add these fields, like in DHCP & TCP
     uint16_t i = 0; //uint8 should suffice
+    // Header Flags:
     mqtt->flags = (MQTT_CONNECT << 4) | 0b0000;
-    mqtt->data[i++] = 0;
+    // Msg Len:
+    mqtt->data[i++] = 0; //i = 0 is length byte
+    // Protocol Name Length:
     mqtt->data[i++] = 4 >> 8;
     mqtt->data[i++] = 4 & 0xFF;
+    // Protocol Name:
     mqtt->data[i++] = 'M';
     mqtt->data[i++] = 'Q';
     mqtt->data[i++] = 'T';
     mqtt->data[i++] = 'T';
-    mqtt->data[i++] = 0x04;
-    mqtt->data[i] = 0;
-    mqtt->data[i++] = MQTT_FLAG_CLEANSESSION | (QOS << 3);
-    mqtt->data[i++] = 60 >> 8;
-    mqtt->data[i++] = 60 & 0xFF;
-    mqtt->data[i++] = 2 >> 8;
-    mqtt->data[i++] = 2 & 0xFF;
-    mqtt->data[i++] = 'G';
-    mqtt->data[i++] = 'P';
+    // Version:
+    mqtt->data[i++] = opt->version;
+    // Connect Flags:
+    mqtt->data[i++] = (opt->willRetain << 5) | (opt->willQos << 3) | (opt->willFlag << 2) | (opt->cleanSession << 1);
+    // Keep Alive:
+    mqtt->data[i++] = opt->keepAlive >> 8;
+    mqtt->data[i++] = opt->keepAlive & 0xFF;
+    // Client ID Length:
+    uint16_t cidLen = str_length(client->clientId);
+    mqtt->data[i++] = cidLen >> 8;
+    mqtt->data[i++] = cidLen & 0xFF;
+    // Client ID:
+    uint8_t o;
+    for (o = 0; o < cidLen; o++) {
+        mqtt->data[i++] = client->clientId[o];
+    }
+    //mqtt->data[i++] = 'G';
+    //mqtt->data[i++] = 'P';
     uint8_t tmplen[4];
     uint8_t lenlen = encodeLength(tmplen, i);
     uint32_t p;
@@ -626,7 +604,7 @@ void sendMqttConnect(uint16_t keepAlive, bool cleanSession, const char* willTopi
     for (p = 0; p < lenlen; p++) {
         mqtt->data[p] = tmplen[p];
     }
-    mqtt->data[0] = i-1; //LENGTH IS BEING CALCULATED INCORRECTLY, LOOK AT THIS LATER
+    mqtt->data[0] = i-1;
     uint16_t dataLength = i + 1;
     socketSendTcp(client->socket, (uint8_t*)mqtt, dataLength);
 }
@@ -638,38 +616,63 @@ void sendMqttConnack() {
 
 }
 
-void sendMqttPublish() {
-    uint8_t etherBuffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)etherBuffer;
+void sendMqttPublish(char strTopic[], char strData[]) {
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
-
+    mqttOptions* opt = &client->options;
+    uint16_t i = 0;
+    uint32_t o;
+    // Header Flags:
+    mqtt->flags = (MQTT_PUBLISH << 4) | (opt->qos << 1);
+    // Msg Len:
+    mqtt->data[i++] = 0;
+    if (opt->qos > 0) {
+        uint16_t packetId = 10;
+        mqtt->data[i++] = packetId >> 8;
+        mqtt->data[i++] = packetId & 0xFF;
+    }
+    uint16_t msgLen = str_length((char*)strData);
+    uint16_t topicLen = str_length((char*)strTopic);
+    // Topic Length:
+    mqtt->data[i++] = topicLen >> 8;
+    mqtt->data[i++] = topicLen & 0xFF;
+    for (o = 0; o < topicLen; o++) {
+        mqtt->data[i++] = strTopic[o];
+    }
+    for (o = 0; o < msgLen; o++) {
+        mqtt->data[i++] = strData[o];
+    }
+    uint8_t tmplen[4];
+    uint8_t lenlen = encodeLength(tmplen, i);
+    uint32_t p;
+    for (p = 1; p < i + lenlen - 1; p++) {
+        mqtt->data[p + lenlen - 1] = mqtt->data[p];
+    }
+    for (p = 0; p < lenlen; p++) {
+        mqtt->data[p] = tmplen[p];
+    }
+    mqtt->data[0] = i-1;
+    uint16_t dataLength = i+1;
+    socketSendTcp(client->socket, (uint8_t*)mqtt, dataLength);
 }
 
 void sendMqttPubAck() {
-    uint8_t etherBuffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)etherBuffer;
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
 
 }
 
 void sendMqttPubRec() {
-    uint8_t etherBuffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)etherBuffer;
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
 
 }
 
 void sendMqttPubComp() {
-    uint8_t etherBuffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)etherBuffer;
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
 
 }
 
 void sendMqttSubscribe(char strTopic[]) {
-    uint8_t etherBuffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)etherBuffer;
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+    mqttOptions* opt = &client->options;
     uint32_t i = 0;
     mqtt->flags = (MQTT_SUBSCRIBE << 4) | 0b0010;
     mqtt->data[i++] = 0;
@@ -694,8 +697,7 @@ void sendMqttSubscribe(char strTopic[]) {
         mqtt->data[p] = tmplen[p];
     }
     mqtt->data[0] = i-1;
-    uint16_t dataLength;
-    dataLength = i+1;
+    uint16_t dataLength = i + 1;
     sendTcpMessage(ether, client->socket, PSH | ACK, (uint8_t*)mqtt, dataLength);
 }
 
@@ -712,7 +714,12 @@ void sendMqttUnsubAck() {
 }
 
 void sendMqttPingReq() {
-
+    mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
+    uint16_t i = 0;
+    mqtt->flags = (MQTT_PINGREQ << 4) | 0b0000;
+    mqtt->data[i++] = 0;
+    uint16_t dataLength = i + 1;
+    socketSendTcp(client->socket, (uint8_t*)mqtt, dataLength);
 }
 
 void sendMqttPingResp() {
@@ -720,15 +727,12 @@ void sendMqttPingResp() {
 }
 
 void sendMqttDisconnect() {
-    uint8_t etherBuffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)etherBuffer;
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
     uint8_t i = 0;
-    mqtt->flags = (MQTT_DISCONNECT << 4) | 0;    // disconnect flag
+    mqtt->flags = (MQTT_DISCONNECT << 4) | 0b0000;    // disconnect flag
     mqtt->data[i++] = 0;              // no length
-    uint16_t dataLength;
-    dataLength = i+1;
-    socketSendTcp(client->socket, mqtt, dataLength);
+    uint16_t dataLength = i + 1;
+    socketSendTcp(client->socket, (uint8_t*)mqtt, dataLength);
     //sendTcpMessage(ether, client->socket, PSH | ACK, (uint8_t*)mqtt, dataLength);
 }
 
