@@ -1,51 +1,188 @@
-// TCP Library
-// Jason Losh
+/******************************************************************************
+ * File:        tcp.c
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/7/24
+ *
+ * Description: -
+ ******************************************************************************/
 
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
-// Target Platform: -
-// Target uC:       -
-// System Clock:    -
-
-// Hardware configuration:
-// -
-
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
-
+#include "uart0.h"
+#include "timer.h"
+#include "arp.h"
+#include "ip.h"
+#include "tcp.h"
+#include "socket.h"
 #include <stdio.h>
 #include <string.h>
-#include "arp.h"
-#include "tcp.h"
-#include "timer.h"
-#include "socket.h"
-#include "uart0.h"
 
-// ------------------------------------------------------------------------------
-//  Globals
-// ------------------------------------------------------------------------------
+//=============================================================================
+// DEFINES AND MACROS
+//=============================================================================
 
+//=============================================================================
+// GLOBALS
+//=============================================================================
 
-// ------------------------------------------------------------------------------
-//  Structures
-// ------------------------------------------------------------------------------
+//=============================================================================
+// STATIC FUNCTIONS
+//=============================================================================
 
+//this function shall be called anytime an error occurs and the application needs to be aware of it
+static void handleSocketError(socket* s, uint8_t errorCode) {
+    socketError err;
+    err.errorCode = errorCode;
+    switch (errorCode) {
+    case SOCKET_ERROR_ARP_TIMEOUT:
+        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "Could not reach %d.%d.%d.%d (timed out)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
+        break;
+    case SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT:
+        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "No response from %d.%d.%d.%d (timed out)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
+        break;
+    case SOCKET_ERROR_CONNECTION_RESET:
+        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "Connection was reset by remote host (%d.%d.%d.%d:%d)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3], s->remotePort);
+        break;
+    }
+    err.sk = s;
+    if (s->errorCallback) {
+        s->errorCallback(&err); // application responsible for deleting socket in the case of an error
+    }
+}
 
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
+static void tcpConnectionRstCallback(socket* s) {
+    //stop timers
+    //set state to closed
+    //call error callback
+    //delete socket
+    stopTimer(s->assocTimer);
+    setTcpState(s, TCP_CLOSED);
+    handleSocketError(s, SOCKET_ERROR_CONNECTION_RESET);
+    //s->connectAttempts = 0;
+}
 
-#define MAX_INITSOCKS 5
+//calls handleSocketError
+//implement FIN_WAIT timeout and other necessary ones
+static void tcpTimeoutCallback(void* context) {
+    socket* s = (socket*)context;
+    if (s) {
+        s->assocTimer = INVALID_TIMER;
+        switch (s->state) {
+        case TCP_CLOSED:
+            //arping timed out
+            handleSocketError(s, SOCKET_ERROR_ARP_TIMEOUT);
+            setTcpState(s, TCP_CLOSED);
+            break;
+        case TCP_SYN_SENT:
+            //synack timed out
+            s->connectAttempts++;
+            if (s->connectAttempts == TCP_MAX_SYN_ATTEMPTS) {
+                //putsUart0("Failed to connect to server\n");
+                s->connectAttempts = 0;
+                handleSocketError(s, SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT);
+                setTcpState(s, TCP_CLOSED);
+            }
+            else {
+                snprintf(out, MAX_UART_OUT, "TCP: Retrying connection to server... (%d/%d)\n", s->connectAttempts+1, TCP_MAX_SYN_ATTEMPTS);
+                putsUart0(out);
+                s->sequenceNumber--; //undo increment of seq n for retransmission of syn
+                pendTcpResponse(s, SYN);
+                setTcpState(s, TCP_SYN_SENT);
+            }
+            break;
+        }
+        //s->state = TCP_CLOSED;
+    }
 
-typedef void(* _fn)(void);
+}
 
-uint8_t isExternal;
+static void completeTcpConCallback(etherHeader* ether, socket* s) {
+    uint32_t ISN = random32();
+    s->sequenceNumber = ISN;
+    s->acknowledgementNumber = 0;
+    setTcpState(s, TCP_SYN_SENT);
+    pendTcpResponse(s, SYN);
+}
 
-char out[100];
-//TODO: test TCP message
+static void tcpTimeWaitCallback(void* context) {
+    socket* s = (socket*)context;
+    setTcpState(s, TCP_CLOSED);
+    deleteSocket(s);
+}
+
+//len is the value shown in wireshark
+static void addTcpOption(uint8_t* options_ptr, uint8_t option_type, uint8_t len, uint8_t data[], uint8_t* options_length) {
+    static uint8_t* last;
+    if (options_ptr == NULL) {
+        options_ptr = last;
+    }
+    if (options_ptr == NULL) {
+        return;
+    }
+    uint32_t i = 0;
+    uint32_t j;
+    options_ptr[i++] = option_type;
+    if (option_type != TCP_OPTION_NO_OP) {
+        options_ptr[i++] = len;
+        for (j = 0; j < len-2; j++) {
+            options_ptr[i++] = data[j];
+        }
+        if (options_length) {
+            *options_length += len;
+        }
+        last = options_ptr + len;
+    }
+    else {
+        if (options_length) {
+            *options_length += 1;
+        }
+        last = options_ptr + 1;
+    }
+}
+
+//used when sending
+static void updateSeqNum(socket* s, etherHeader* ether) {
+    //if (!s->retransmitting) {
+    if (isTcpSyn(ether) || isTcpFin(ether)) {
+        s->sequenceNumber += 1;
+    }
+    else if (isTcpPsh(ether)) {
+        uint16_t len = getTcpDataLength(ether);
+        s->sequenceNumber += len;
+    }
+    //}
+}
+
+//used when receiving
+static void updateAckNum(socket* s, etherHeader* ether) {
+    tcpHeader* tcp = getTcpHeader(ether);
+    uint8_t state = getTcpState(s);
+    if (state != TCP_ESTABLISHED) {
+        if (isTcpSyn(ether) || isTcpFin(ether)) {
+            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+        }
+    }
+    else {
+        if (isTcpPsh(ether)) {
+            uint16_t len = getTcpDataLength(ether);
+            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + len;
+        }
+        else if (isTcpFin(ether)) {
+            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
+        }
+        else if (isTcpAck(ether)) {
+            //s->acknowledgementNumber = ntohl(tcp->acknowledgementNumber);
+        }
+    }
+}
+
+//=============================================================================
+// PUBLIC FUNCTIONS
+//=============================================================================
 
 // Set TCP state
 void setTcpState(socket* s, uint8_t state) {
@@ -66,6 +203,34 @@ tcpHeader* getTcpHeader(etherHeader* ether) {
     ipHeader* ip = (ipHeader*)ether->data;
     tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
     return tcp;
+}
+
+uint8_t* getTcpData(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    uint8_t* payload = tcp->data;
+    return payload;
+}
+
+uint16_t getTcpDataLength(etherHeader* ether) {
+    ipHeader* ip = getIpHeader(ether);
+    tcpHeader* tcp = getTcpHeader(ether);
+    uint16_t payload_length = ntohs(ip->length) - (ip->size * 4) - ((ntohs(tcp->offsetFields) >> 12) * 4);
+    return payload_length;
+}
+
+bool isTcpPortOpen(etherHeader* ether) {
+    tcpHeader* tcp = getTcpHeader(ether);
+    uint16_t port = ntohs(tcp->destPort);
+    int i;
+    socket* sockets = getSockets();
+    for (i = 0; i < MAX_SOCKETS; i++) {
+        socket* s = &sockets[i];
+        if (s->localPort == port && s->state != TCP_CLOSED) {
+            return true;
+        }
+    }
+    return false;
 }
 
 // Determines whether packet is TCP packet
@@ -101,12 +266,6 @@ bool isTcpSyn(etherHeader* ether) {
     return htons(tcp->offsetFields) & SYN;
 }
 
-bool isTcpFin(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    return isTcp(ether) && (htons(tcp->offsetFields) & FIN);
-}
-
 bool isTcpAck(etherHeader* ether) {
     ipHeader* ip = (ipHeader*)ether->data;
     tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
@@ -114,6 +273,12 @@ bool isTcpAck(etherHeader* ether) {
         return false;
     }
     return htons(tcp->offsetFields) & ACK;
+}
+
+bool isTcpFin(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    return isTcp(ether) && (htons(tcp->offsetFields) & FIN);
 }
 
 bool isTcpPsh(etherHeader* ether) {
@@ -125,63 +290,20 @@ bool isTcpPsh(etherHeader* ether) {
     return htons(tcp->offsetFields) & PSH;
 }
 
+bool isTcpRst(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    if (!isTcp(ether)) {
+        return false;
+    }
+    return htons(tcp->offsetFields) & RST;
+}
+
 /*void resetConCallback(void* context) { //make this function take a parameter if needed
 
     snprintf(out, 100, "Could not reach %d.%d.%d.%d (timed out)\n", initSock->remoteIpAddress[0], initSock->remoteIpAddress[1], initSock->remoteIpAddress[2], initSock->remoteIpAddress[3]);
     putsUart0(out);
 }*/
-
-void handleSocketError(socket* s, uint8_t errorCode) {
-    socketError err;
-    err.errorCode = errorCode;
-    switch (errorCode) {
-    case SOCKET_ERROR_ARP_TIMEOUT:
-        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "Could not reach %d.%d.%d.%d (timed out)\n", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
-        break;
-    case SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT:
-        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "No response from %d.%d.%d.%d (timed out)\n", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
-        break;
-    }
-    err.sk = s;
-    if (s->errorCallback) {
-        s->errorCallback(&err);
-    }
-}
-
-//implement FIN_WAIT timeout and other necessary ones
-void tcpTimeoutCallback(void* context) {
-    static uint8_t attempts = 0;
-    socket* s = (socket*)context;
-    if (s) {
-        s->assocTimer = INVALID_TIMER;
-        switch (s->state) {
-        case TCP_CLOSED:
-            //arping timed out
-            handleSocketError(s, SOCKET_ERROR_ARP_TIMEOUT);
-            setTcpState(s, TCP_CLOSED);
-            break;
-        case TCP_SYN_SENT:
-            //synack timed out
-            attempts++;
-            if (attempts == 2) {
-                putsUart0("Reached max number of attempts to connect to server\n");
-                attempts = 0;
-                handleSocketError(s, SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT);
-                setTcpState(s, TCP_CLOSED);
-            }
-            else {
-                //putsUart0("Retrying connection to server...\n");
-                //s->retransmitting = 1; //used to not incremen SEQ
-                s->sequenceNumber--;
-                pendTcpResponse(s, SYN);
-                setTcpState(s, TCP_SYN_SENT);
-            }
-            break;
-        }
-        //s->state = TCP_CLOSED;
-    }
-
-}
 
 void openTcpConnection(etherHeader* ether, socket* s) {
     uint8_t localIp[4];
@@ -199,17 +321,9 @@ void openTcpConnection(etherHeader* ether, socket* s) {
     }
     else {
         sendArpRequest(ether, localIp, isIpLocal ? s->remoteIpAddress : gateway); //if IP is in same subnet, send ARP for that IP, else send ARP to gateway
-        uint8_t arpTimer = startOneshotTimer(tcpTimeoutCallback, 30, s); //wait 30 seconds for arp
+        uint8_t arpTimer = startOneshotTimer(tcpTimeoutCallback, TCP_ARP_TIMEOUT, s); //wait 30 seconds for arp
         s->assocTimer = arpTimer; //assign timer id to socket or local port (multiple ways to do this)
     }
-}
-
-void completeTcpConCallback(etherHeader* ether, socket* s) {
-    uint32_t ISN = random32();
-    s->sequenceNumber = ISN;
-    s->acknowledgementNumber = 0;
-    setTcpState(s, TCP_SYN_SENT);
-    pendTcpResponse(s, SYN);
 }
 
 void closeTcpConnection(etherHeader* ether, socket* s) {
@@ -243,7 +357,7 @@ void sendTcpPendingMessages(etherHeader* ether) {
                 //switch statement is for actions to happen once sent
                 switch (s->state) {
                 case TCP_SYN_SENT:
-                    s->assocTimer = startOneshotTimer(tcpTimeoutCallback, 3, s);
+                    s->assocTimer = startOneshotTimer(tcpTimeoutCallback, TCP_SYN_TIMEOUT, s);
                     break;
                 case TCP_ESTABLISHED:
                     if ((flags & ACK) && fin) {
@@ -261,78 +375,19 @@ void sendTcpPendingMessages(etherHeader* ether) {
     }
 }
 
-void handleTcpData(etherHeader* ether, socket* s) {
+/*void handleTcpData(etherHeader* ether, socket* s) {
     ipHeader* ip = (ipHeader*)ether->data;
     tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
     uint16_t payload_length = ntohs(ip->length) - (ip->size * 4) - ((ntohs(tcp->offsetFields) >> 12) * 4);
 
-}
-
-uint8_t* getTcpData(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    uint8_t* payload = tcp->data;
-    return payload;
-}
-
-uint16_t getTcpDataLength(etherHeader* ether) {
-    ipHeader* ip = getIpHeader(ether);
-    tcpHeader* tcp = getTcpHeader(ether);
-    uint16_t payload_length = ntohs(ip->length) - (ip->size * 4) - ((ntohs(tcp->offsetFields) >> 12) * 4);
-    return payload_length;
 }
 
 uint8_t isTcpDataAvailable(etherHeader* ether) {
     //ipHeader* ip = (ipHeader*)ether->data;
     //tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
 
-}
+}*/
 
-void pendTcpResponse(socket* s, uint8_t flags) {
-    s->flags = flags;
-}
-
-void tcpTimeWaitCallback(void* context) {
-    socket* s = (socket*)context;
-    setTcpState(s, TCP_CLOSED);
-    deleteSocket(s);
-}
-
-//used when sending
-void updateSeqNum(socket* s, etherHeader* ether) {
-    //if (!s->retransmitting) {
-    if (isTcpSyn(ether) || isTcpFin(ether)) {
-        s->sequenceNumber += 1;
-    }
-    else if (isTcpPsh(ether)) {
-        uint16_t len = getTcpDataLength(ether);
-        s->sequenceNumber += len;
-    }
-    //}
-}
-
-//used when receiving
-void updateAckNum(socket* s, etherHeader* ether) {
-    tcpHeader* tcp = getTcpHeader(ether);
-    uint8_t state = getTcpState(s);
-    if (state != TCP_ESTABLISHED) {
-        if (isTcpSyn(ether) || isTcpFin(ether)) {
-            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
-        }
-    }
-    else {
-        if (isTcpPsh(ether)) {
-            uint16_t len = getTcpDataLength(ether);
-            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + len;
-        }
-        else if (isTcpFin(ether)) {
-            s->acknowledgementNumber = ntohl(tcp->sequenceNumber) + 1;
-        }
-        else if (isTcpAck(ether)) {
-            //s->acknowledgementNumber = ntohl(tcp->acknowledgementNumber);
-        }
-    }
-}
 
 void processTcpResponse(etherHeader* ether) {
     tcpHeader* tcp = getTcpHeader(ether);
@@ -350,6 +405,13 @@ void processTcpResponse(etherHeader* ether) {
                 pendTcpResponse(s, ACK); //s->flags = ACK;
                 setTcpState(s, TCP_ESTABLISHED); //s->state = TCP_ESTABLISHED;
             }
+            else if (isTcpRst(ether)) {
+                tcpConnectionRstCallback(s);
+                //stop timers
+                //set state to closed
+                //call error callback
+                //delete socket
+            }
             break;
         case TCP_ESTABLISHED:
             if (isTcpPsh(ether)) {
@@ -363,6 +425,9 @@ void processTcpResponse(etherHeader* ether) {
                 fin = 1;
                 //setTcpState(s, TCP_CLOSE_WAIT);
             }
+            else if (isTcpRst(ether)) {
+                tcpConnectionRstCallback(s);
+            }
             else if (isTcpAck(ether)) {
 
             }
@@ -372,7 +437,7 @@ void processTcpResponse(etherHeader* ether) {
             //pendTcpResponse(FIN | ACK);
             break;
         case TCP_LAST_ACK:
-            if (isTcpAck(ether)) {
+            if (isTcpAck(ether) || isTcpRst(ether)) {
                 setTcpState(s, TCP_CLOSED);
                 deleteSocket(s);
             }
@@ -382,12 +447,22 @@ void processTcpResponse(etherHeader* ether) {
                 pendTcpResponse(s, ACK);
                 setTcpState(s, TCP_CLOSING);
             }
-            if (isTcpAck(ether)) {
+            else if (isTcpRst(ether)) {
+                //close the connection immediately and move to CLOSED
+                //setTcpState(s, TCP_CLOSED);
+                tcpConnectionRstCallback(s);
+            }
+            else if (isTcpAck(ether)) {
                 setTcpState(s, TCP_FIN_WAIT_2);
             }
             break;
         case TCP_CLOSING:
-            if (isTcpAck(ether)) {
+            if (isTcpRst(ether)) {
+                //skip TIME_WAIT
+                //go to CLOSED
+                tcpConnectionRstCallback(s);
+            }
+            else if (isTcpAck(ether)) {
                 setTcpState(s, TCP_TIME_WAIT);
                 startOneshotTimer(tcpTimeWaitCallback, 10, s);
             }
@@ -397,6 +472,9 @@ void processTcpResponse(etherHeader* ether) {
                 pendTcpResponse(s, ACK);
                 setTcpState(s, TCP_TIME_WAIT);
                 startOneshotTimer(tcpTimeWaitCallback, 10, s);
+            }
+            else if (isTcpRst(ether)) {
+                tcpConnectionRstCallback(s);
             }
             break;
         }
@@ -422,48 +500,8 @@ void processTcpArpResponse(etherHeader* ether) {
     }
 }
 
-bool isTcpPortOpen(etherHeader* ether) {
-    tcpHeader* tcp = getTcpHeader(ether);
-    uint16_t port = ntohs(tcp->destPort);
-    int i;
-    socket* sockets = getSockets();
-    for (i = 0; i < MAX_SOCKETS; i++) {
-        socket* s = &sockets[i];
-        if (s->localPort == port && s->state != TCP_CLOSED) {
-            return true;
-        }
-    }
-    return false;
-}
-
-//len is the value shown in wireshark
-void addTcpOption(uint8_t* options_ptr, uint8_t option_type, uint8_t len, uint8_t data[], uint8_t* options_length) {
-    static uint8_t* last;
-    if (options_ptr == NULL) {
-        options_ptr = last;
-    }
-    if (options_ptr == NULL) {
-        return;
-    }
-    uint32_t i = 0;
-    uint32_t j;
-    options_ptr[i++] = option_type;
-    if (option_type != TCP_OPTION_NO_OP) {
-        options_ptr[i++] = len;
-        for (j = 0; j < len-2; j++) {
-            options_ptr[i++] = data[j];
-        }
-        if (options_length) {
-            *options_length += len;
-        }
-        last = options_ptr + len;
-    }
-    else {
-        if (options_length) {
-            *options_length += 1;
-        }
-        last = options_ptr + 1;
-    }
+void pendTcpResponse(socket* s, uint8_t flags) {
+    s->flags = flags;
 }
 
 void sendTcpResponse(etherHeader* ether, socket* s, uint16_t flags){

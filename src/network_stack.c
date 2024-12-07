@@ -11,6 +11,7 @@
 #include "udp.h"
 #include "tcp.h"
 #include "mqtt.h"
+#include "mqtt_client.h"
 #include <string.h>
 
 uint8_t buffer[MAX_PACKET_SIZE];
@@ -197,7 +198,9 @@ void processArpData(etherHeader* data) {
     }
     if (isArpResponse(data)) {
         arpPacket* arp = getArpPacket(data);
-        addArpEntry(arp->sourceIp, arp->sourceAddress);
+        if (!lookupArpEntry(arp->sourceIp, NULL)) {
+            addArpEntry(arp->sourceIp, arp->sourceAddress);
+        }
         processDhcpArpResponse(data);
         processTcpArpResponse(data);
     }

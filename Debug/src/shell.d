@@ -17,11 +17,13 @@ src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/tm4c123gh6pm.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/uart0.h
 src/shell.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/eth0.h
+src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/arp.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/ip.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/dhcp.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/udp.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/socket.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/timer.h
+src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/mqtt_client.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/mqtt.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/tcp.h
 src/shell.obj: C:/Users/gianc/IoT/HydraSense/include/strlib.h
@@ -65,6 +67,8 @@ C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
 
 C:/Users/gianc/IoT/HydraSense/include/eth0.h:
 
+C:/Users/gianc/IoT/HydraSense/include/arp.h:
+
 C:/Users/gianc/IoT/HydraSense/include/ip.h:
 
 C:/Users/gianc/IoT/HydraSense/include/dhcp.h:
@@ -74,6 +78,8 @@ C:/Users/gianc/IoT/HydraSense/include/udp.h:
 C:/Users/gianc/IoT/HydraSense/include/socket.h:
 
 C:/Users/gianc/IoT/HydraSense/include/timer.h:
+
+C:/Users/gianc/IoT/HydraSense/include/mqtt_client.h:
 
 C:/Users/gianc/IoT/HydraSense/include/mqtt.h:
 

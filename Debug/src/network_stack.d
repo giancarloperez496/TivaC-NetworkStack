@@ -27,6 +27,7 @@ src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/socket.h
 src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/timer.h
 src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/tcp.h
 src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/mqtt.h
+src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/mqtt_client.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/xlocale/_string.h
 
@@ -83,6 +84,8 @@ C:/Users/gianc/IoT/HydraSense/include/timer.h:
 C:/Users/gianc/IoT/HydraSense/include/tcp.h:
 
 C:/Users/gianc/IoT/HydraSense/include/mqtt.h:
+
+C:/Users/gianc/IoT/HydraSense/include/mqtt_client.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h:
 

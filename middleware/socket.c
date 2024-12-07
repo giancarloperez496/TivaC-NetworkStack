@@ -1,21 +1,16 @@
-// Socket Library
-// Jason Losh
+/******************************************************************************
+ * File:        socket.c
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/7/24
+ *
+ * Description: -
+ ******************************************************************************/
 
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
-
-// Target Platform: -
-// Target uC:       -
-// System Clock:    -
-
-// Hardware configuration:
-// -
-
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
-
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
 #include "socket.h"
 #include "ip.h"
@@ -25,29 +20,28 @@
 #include "timer.h"
 #include <stdio.h>
 
+//=============================================================================
+// DEFINES AND MACROS
+//=============================================================================
 
-// ------------------------------------------------------------------------------
-//  Globals
-// ------------------------------------------------------------------------------
+//=============================================================================
+// GLOBALS
+//=============================================================================
 
 //using all as TCP sockets
 uint8_t socketCount = 0;
 socket sockets[MAX_SOCKETS];
 
-// ------------------------------------------------------------------------------
-//  Structures
-// ------------------------------------------------------------------------------
-
-
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
+//=============================================================================
+// PUBLIC FUNCTIONS
+//=============================================================================
 
 void initSockets(void) {
     uint8_t i;
     for (i = 0; i < MAX_SOCKETS; i++) {
         sockets[i].state = TCP_CLOSED;
         sockets[i].assocTimer = INVALID_TIMER;
+        sockets[i].connectAttempts = 0;
     }
 }
 
@@ -119,13 +113,10 @@ void socketRecvFrom() {
 void socketConnectTcp(socket* s, uint8_t serverIp[4], uint16_t port) {
     uint8_t buffer[MAX_PACKET_SIZE];
     etherHeader* ether = (etherHeader*)buffer;
-
     getIpAddress(s->localIpAddress);
     s->localPort = (random32() & 0x3FFF) + 49152;
-
     copyIpAddress(s->remoteIpAddress, serverIp);
     s->remotePort = port;
-
     openTcpConnection(ether, s);
 }
 
@@ -138,7 +129,6 @@ void socketSendTcp(socket* s, uint8_t* data, uint16_t length) {
     sendTcpMessage(ether, s, PSH | ACK, data, length);
     s->sequenceNumber += length;
 }
-//void sendTcpMessage(etherHeader* ether, socket* s, uint16_t flags, uint8_t data[], uint16_t dataSize)
 
 /*uint16_t socketRecvTcp(socket* s, uint8_t* buf) {
 

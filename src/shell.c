@@ -3,9 +3,10 @@
 #include "uart0.h"
 #include "eeprom.h"
 #include "eth0.h"
+#include "arp.h"
 #include "ip.h"
 #include "dhcp.h"
-#include "mqtt.h"
+#include "mqtt_client.h"
 #include "strlib.h"
 #include <inttypes.h>
 #include <network_stack.h>
@@ -15,6 +16,7 @@ char strInput[MAX_CHARS+1];
 uint8_t count = 0;
 
 extern mqttClient* mqclient;
+extern arp_entry_t arpTable[MAX_ARP_ENTRIES];
 
 uint8_t asciiToUint8(const char str[]) {
     uint8_t data;
@@ -25,16 +27,17 @@ uint8_t asciiToUint8(const char str[]) {
     return data;
 }
 
-void displayConnectionInfo() {
+void ipconfig() {
     uint8_t i;
     char str[20];
     uint8_t mac[6];
     uint8_t ip[4];
     getEtherMacAddress(mac);
-    putsUart0("  HW:    ");
+    putsUart0("\nIP Configuration\n------------------------------------------------------------\n");
+    putsUart0("  MAC:   ");
     for (i = 0; i < HW_ADD_LENGTH; i++)
     {
-        snprintf(str, sizeof(str), "%02x", mac[i]);
+        snprintf(str, sizeof(str), "%02X", mac[i]);
         putsUart0(str);
         if (i < HW_ADD_LENGTH-1)
             putcUart0(':');
@@ -85,7 +88,7 @@ void displayConnectionInfo() {
     }
     putcUart0('\n');
     getIpTimeServerAddress(ip);
-    putsUart0("  Time:  ");
+    putsUart0("  NTP:   ");
     for (i = 0; i < IP_ADD_LENGTH; i++)
     {
         snprintf(str, sizeof(str), "%"PRIu8, ip[i]);
@@ -121,6 +124,7 @@ void displayConnectionInfo() {
         putsUart0("  Link is up\n");
     else
         putsUart0("  Link is down\n");
+    putsUart0("------------------------------------------------------------\n\n");
 }
 
 void processShell() {
@@ -201,11 +205,14 @@ void processShell() {
                         unsubscribeMqtt(topic);
                 }
             }
-            if (str_equal(token, "ip")) {
-                displayConnectionInfo();
+            if (str_equal(token, "ipconfig")) {
+                ipconfig();
             }
             if (str_equal(token, "netstat")) {
                 netstat();
+            }
+            if (str_equal(token, "arp")) {
+                displayArpTable();
             }
             if (str_equal(token, "ping")) {
                 for (i = 0; i < IP_ADD_LENGTH; i++)

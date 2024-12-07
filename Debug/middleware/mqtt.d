@@ -13,13 +13,13 @@ middleware/mqtt.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/incl
 middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/mqtt.h
 middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/tcp.h
 middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/ip.h
+middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/eth0.h
 middleware/mqtt.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdint.h
 middleware/mqtt.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_stdint40.h
 middleware/mqtt.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/stdint.h
 middleware/mqtt.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 middleware/mqtt.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
 middleware/mqtt.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
-middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/eth0.h
 middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/socket.h
 middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/timer.h
 middleware/mqtt.obj: C:/Users/gianc/IoT/HydraSense/include/uart0.h
@@ -51,6 +51,8 @@ C:/Users/gianc/IoT/HydraSense/include/tcp.h:
 
 C:/Users/gianc/IoT/HydraSense/include/ip.h:
 
+C:/Users/gianc/IoT/HydraSense/include/eth0.h:
+
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdint.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_stdint40.h:
@@ -62,8 +64,6 @@ C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
-
-C:/Users/gianc/IoT/HydraSense/include/eth0.h:
 
 C:/Users/gianc/IoT/HydraSense/include/socket.h:
 

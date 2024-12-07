@@ -1,32 +1,31 @@
-// DHCP Library
-// Jason Losh
+/******************************************************************************
+ * File:        dhcp.c
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/7/24
+ *
+ * Description: -
+ ******************************************************************************/
 
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
-// Target Platform: -
-// Target uC:       -
-// System Clock:    -
-
-// Hardware configuration:
-// -
-
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
-
-#include <network_stack.h>
-#include "dhcp.h"
-#include "arp.h"
 #include "timer.h"
 #include "eeprom.h"
 #include "uart0.h"
+#include "arp.h"
+#include "dhcp.h"
 #include <stdio.h>
 
-// ------------------------------------------------------------------------------
-//  Globals
-// ------------------------------------------------------------------------------
+//=============================================================================
+// DEFINES AND MACROS
+//=============================================================================
+
+//=============================================================================
+// GLOBALS
+//=============================================================================
 
 uint32_t xid = 0xEFBEADDE;
 uint32_t leaseSeconds = 0;
@@ -55,16 +54,11 @@ uint8_t leaseEndTimer;
 uint8_t arpTestTimer;
 uint8_t releaseTimer;
 uint8_t newAddTimer;
+uint8_t leaseTickTimer;
 
-// ------------------------------------------------------------------------------
-//  Structures
-// ------------------------------------------------------------------------------
-
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
-
-// State functions
+//=============================================================================
+// PUBLIC FUNCTIONS
+//=============================================================================
 
 void setDhcpState(uint8_t state) {
     dhcpState = state;
@@ -93,7 +87,7 @@ void callbackDhcpT1PeriodicTimer(void* c) {
 }
 
 void callbackDhcpT1HitTimer(void* c) {
-    putsUart0("T1 Hit reached\n");
+    putsUart0("DHCP: T1 Hit reached\n");
     setDhcpState(DHCP_RENEWING);
     t1PeriodicTimer = startPeriodicTimer(callbackDhcpT1PeriodicTimer, 15, NULL);
 }
@@ -101,7 +95,7 @@ void callbackDhcpT1HitTimer(void* c) {
 // Rebind functions
 
 void rebindDhcp() {
-    putsUart0("Rebinding IP, finding any DHCP server...\n");
+    putsUart0("DHCP: Rebinding IP, finding any DHCP server...\n");
     requestNeeded = true;
 }
 
@@ -121,14 +115,19 @@ void callbackDhcpLeaseEndTimer(void* c) {
     releaseDhcp();
 }
 
+void dhcpLeaseTick(void* c) {
+    leaseSeconds--;
+}
+
 // Release functions
 void releaseDhcp() {
-    putsUart0("Releasing IP\n");
+    putsUart0("DHCP: IP Address Released\n");
     stopTimer(t1HitTimer);
     stopTimer(t1PeriodicTimer);
     stopTimer(t2HitTimer);
     stopTimer(t2PeriodicTimer);
     stopTimer(leaseEndTimer);
+    stopTimer(leaseTickTimer);
     if (getDhcpState() != DHCP_INIT) {
         releaseNeeded = true;
     }
@@ -149,12 +148,13 @@ void renewIp() {
 
 void renewDhcp() {
     //putsUart0("going to BOUND, starting T1, T2, leaseTimer...\n");
-    putsUart0("IP address acquired\n");
+    putsUart0("DHCP: IP Address acquired\n");
     setDhcpState(DHCP_BOUND);
     setIpAddress(dhcpOfferedIpAdd);
     t1HitTimer = startOneshotTimer(callbackDhcpT1HitTimer, leaseT1, NULL);
     t2HitTimer = startOneshotTimer(callbackDhcpT2HitTimer, leaseT2, NULL);
     leaseEndTimer = startOneshotTimer(callbackDhcpLeaseEndTimer, leaseSeconds, NULL);
+    leaseTickTimer = startPeriodicTimer(dhcpLeaseTick, 1, NULL);
 }
 
 // IP conflict detection
@@ -169,7 +169,7 @@ void requestDhcpIpConflictTest(etherHeader* ether) {
     dhcpFrame* dhcp = (dhcpFrame*)((uint8_t*)udp->data);
     uint8_t ip[4] = {0, 0, 0, 0};
     sendArpRequest(ether, ip, dhcp->yiaddr);
-    putsUart0("Sending ARP...\n");
+    putsUart0("DHCP: Sending ARP...\n");
     setDhcpState(DHCP_TESTING_IP);
     arpTestTimer = startOneshotTimer(callbackDhcpIpConflictWindow, 10, NULL); //was 5 seconds
 }
@@ -418,11 +418,13 @@ void handleDhcpAck(etherHeader *ether) {
         stopTimer(t1PeriodicTimer);
         stopTimer(t2HitTimer);
         stopTimer(leaseEndTimer);
+        stopTimer(leaseTickTimer);
         renewDhcp();
         break;
     case DHCP_REBINDING:
         stopTimer(t2PeriodicTimer);
         stopTimer(leaseEndTimer);
+        stopTimer(leaseTickTimer);
         renewDhcp();
         break;
     case DHCP_REQUESTING:
@@ -468,8 +470,8 @@ void sendDhcpPendingMessages(etherHeader* ether) {
         }
         if (isDhcpDiscoverNeeded()) {
             discoverNeeded = false;
-            putsUart0("Sending DISCOVER...\n");
             sendDhcpMessage(ether, DHCPDISCOVER);
+            putsUart0("DHCP: Sending DISCOVER...\n");
             setDhcpState(DHCP_SELECTING);
             releaseTimer = startOneshotTimer(callbackDhcpLeaseEndTimer, 15, NULL); //calls releaseDhcp();
         }
@@ -512,7 +514,8 @@ void sendDhcpPendingMessages(etherHeader* ether) {
     case DHCP_REBINDING:
         if (isDhcpRequestNeeded()) {
             requestNeeded = false;
-            putsUart0("Looking for any DHCP server... sending request to 255.255.255.255\n");
+            //putsUart0("Looking for any DHCP server... sending request to 255.255.255.255\n");
+            putsUart0("DHCP: Rebinding IP, broadcasting REQUEST\n");
             int i;
             uint8_t* options = getDhcpOption(ether, DHCP_OPTION_SERVER_ID);
             for (i = 0; i < IP_ADD_LENGTH; i++) {
@@ -596,6 +599,7 @@ void disableDhcp() {
     stopTimer(t2HitTimer);
     stopTimer(t2PeriodicTimer);
     stopTimer(leaseEndTimer);
+    stopTimer(leaseTickTimer);
     releaseNeeded = true;
     dhcpEnabled = false;
 }

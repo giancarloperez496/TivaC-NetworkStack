@@ -23,8 +23,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-typedef struct _icmpHeader // 8 bytes
-{
+typedef struct _icmpHeader {// 8 bytes{
   uint8_t type;
   uint8_t code;
   uint16_t check;

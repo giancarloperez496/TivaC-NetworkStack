@@ -73,9 +73,12 @@
 #define MQTT_CLIENT_STATE_MQTT_CONNECTED 5
 #define MQTT_CLIENT_STATE_DISCONNECTING 6
 
+/* MQTT Broker States */
+
+
 /* MQTT Default Send Parameters */
       //MQTT_CONNECT_
-#define DEFAULT_KEEPALIVE 10
+#define DEFAULT_KEEPALIVE 60
 #define DEFAULT_CLEANSESSION 1
 #define DEFAULT_WILLTOPIC NULL
 #define DEFAULT_WILLMSG NULL
@@ -91,21 +94,19 @@
 #define MAX_TOPIC_LENGTH 30
 #define MAX_MQTT_DATA_SIZE 50
 #define MAX_MQTT_PACKET_SIZE 256
-
-/* Config */
 #define MQTT_PORT 1883
-#define MQTT_VERSION MQTT_VERSION_v3_1_1
-#define USE_WILL 0
-
 
 //=============================================================================
-// TYPEDEFS AND STRUCTURES
+// TYPEDEFS AND GLOBALS
 //=============================================================================
 
-typedef struct _mqttHeader {// 20 or more bytes
-    uint8_t flags; //4bits packet type - 4 bits flags
-    uint8_t data[0];
-} mqttHeader;
+typedef struct _mqttData {
+    char topic[MAX_TOPIC_LENGTH];
+    const void* data;
+    uint16_t dataLen;
+} mqttData;
+
+typedef void (*mqtt_callback_t)(const mqttData* data); //function(mqttData context)
 
 typedef struct _mqttOptions {
     uint8_t version;
@@ -126,51 +127,50 @@ typedef struct _mqttClient {
     char mqttTopics[MAX_TOPICS][MAX_TOPIC_LENGTH];
     uint16_t topicCount;
     mqttOptions options;
+    //callbacks
+    mqtt_callback_t pubCallback;
+
     //timers
     uint8_t timeoutTimer;
     uint8_t keepAliveTimer;
 } mqttClient;
 
-typedef struct mqttError {
+typedef struct _mqttBroker {
+    uint8_t numClients;
+} mqttBroker;
+
+typedef struct _mqttError {
     uint8_t errorCode;
     socket* sk;
     char errorMsg[SOCKET_ERROR_MAX_MSG_LEN];
 } mqttError;
 
+typedef struct _mqttHeader {// 20 or more bytes
+    uint8_t flags; //4bits packet type - 4 bits flags
+    uint8_t data[0];
+} mqttHeader;
+
+
 //=============================================================================
 // FUNCTION PROTOTYPES
 //=============================================================================
 
+uint32_t decodeLength(const uint8_t* data, uint16_t* dataLen);
 mqttHeader* getMqttHeader(etherHeader* ether);
-void setMqttState(uint8_t state);
-uint8_t getMqttState();
 bool isMqttResponse(etherHeader* ether);
-void initMqtt();
-void runMqttClient();
-void processMqttData(etherHeader* ether);
-void processMqttPublish(mqttHeader* mqtt, uint8_t* topicIndex, char* command);
-void connectMqtt();
-void disconnectMqtt();
-void publishMqtt(char strTopic[], char strData[]);
-void subscribeMqtt(char strTopic[]);
-void unsubscribeMqtt(char strTopic[]);
-
-
-//void sendMqttMessage(uint8_t msg);
-
-void sendMqttConnect(uint16_t keepAlive, bool cleanSession, const char* willTopic, const char* willMsg, uint8_t willQoS, bool willRetain);
-void sendMqttConnack();
-void sendMqttPublish();
-void sendMqttPubAck();
-void sendMqttPubRec() ;
-void sendMqttPubComp();
-void sendMqttSubscribe();
-void sendMqttSubAck();
-void sendMqttUnsubscribe();
-void sendMqttUnsubAck();
-void sendMqttPingReq();
-void sendMqttPingResp();
-void sendMqttDisconnect();
+void sendMqttConnect(mqttClient* client);
+void sendMqttConnack(mqttClient* client);
+void sendMqttPublish(mqttClient* client, char strTopic[], char strData[]);
+void sendMqttPubAck(mqttClient* client);
+void sendMqttPubRec(mqttClient* client);
+void sendMqttPubComp(mqttClient* client);
+void sendMqttSubscribe(mqttClient* client, char strTopic[]);
+void sendMqttSubAck(mqttClient* client);
+void sendMqttUnsubscribe(mqttClient* client, char strTopic[]);
+void sendMqttUnsubAck(mqttClient* client);
+void sendMqttPingReq(mqttClient* client);
+void sendMqttPingResp(mqttClient* client);
+void sendMqttDisconnect(mqttClient* client);
 
 #endif
 

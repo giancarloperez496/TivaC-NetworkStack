@@ -30,31 +30,26 @@
 // Device includes, defines, and assembler directives
 //-----------------------------------------------------------------------------
 
+/* Standard Libraries */
 #include <inttypes.h>
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
-#include <ip.h>
-#include "network_stack.h"
+/* Drivers */
 #include "tm4c123gh6pm.h"
 #include "clock.h"
 #include "gpio.h"
-#include "spi0.h"
-#include "eeprom.h"
 #include "uart0.h"
+/* Libraries */
 #include "wait.h"
-#include "timer.h"
+#include "mqtt_client.h"
+#include "strlib.h"
+/* Applications */
+#include "network_stack.h"
 #include "shell.h"
 #include "sensors.h"
-#include "socket.h"
-#include "mqtt.h"
-
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
-
 
 // Initialize Hardware
 void initHw() {
@@ -72,20 +67,29 @@ void initHw() {
     enablePinPullup(PUSH_BUTTON);
 }
 
+//Application Logic
+
+void handlePublish(const mqttData* data) {
+    putsUart0("Application: Handling Publish\n");
+    if (str_equal(data->topic, "TEST")) {
+        //handle data
+    }
+    else if (str_equal(data->topic, "TOPIC")) {
+        //handle data
+    }
+}
+
+void sampleIsr() {
+
+
+    //clear interrupt flag
+}
 
 //-----------------------------------------------------------------------------
 // Main
 //-----------------------------------------------------------------------------
 
-// Max packet is calculated as:
-// Ether frame header (18) + Max MTU (1500)
-
-/*
- * Active Open works
- * Active Close works
- * Passive Close - needs work
- * Passive open - server
- */
+//topics and behavior will be defind and set in here
 int main(void) {
     // Init controller
     initHw();
@@ -108,13 +112,8 @@ int main(void) {
     initEeprom();
     readConfiguration();
 
-    setPinValue(GREEN_LED, 1);
-    waitMicrosecond(100000);
-    setPinValue(GREEN_LED, 0);
-    waitMicrosecond(100000);
-
-    initMqtt();
-
+    initMqttClient();
+    setHandlePublishCallback(handlePublish);
     //uint8_t printTimer = startPeriodicTimer(printSensorData, 5, NULL);
 
     while (true) {

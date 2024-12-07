@@ -11,7 +11,6 @@ C_SRCS += \
 ../drivers/eth0.c \
 ../drivers/gpio.c \
 ../drivers/spi0.c \
-../drivers/timer.c \
 ../drivers/uart0.c 
 
 C_DEPS += \
@@ -20,7 +19,6 @@ C_DEPS += \
 ./drivers/eth0.d \
 ./drivers/gpio.d \
 ./drivers/spi0.d \
-./drivers/timer.d \
 ./drivers/uart0.d 
 
 OBJS += \
@@ -29,7 +27,6 @@ OBJS += \
 ./drivers/eth0.obj \
 ./drivers/gpio.obj \
 ./drivers/spi0.obj \
-./drivers/timer.obj \
 ./drivers/uart0.obj 
 
 OBJS__QUOTED += \
@@ -38,7 +35,6 @@ OBJS__QUOTED += \
 "drivers\eth0.obj" \
 "drivers\gpio.obj" \
 "drivers\spi0.obj" \
-"drivers\timer.obj" \
 "drivers\uart0.obj" 
 
 C_DEPS__QUOTED += \
@@ -47,7 +43,6 @@ C_DEPS__QUOTED += \
 "drivers\eth0.d" \
 "drivers\gpio.d" \
 "drivers\spi0.d" \
-"drivers\timer.d" \
 "drivers\uart0.d" 
 
 C_SRCS__QUOTED += \
@@ -56,7 +51,6 @@ C_SRCS__QUOTED += \
 "../drivers/eth0.c" \
 "../drivers/gpio.c" \
 "../drivers/spi0.c" \
-"../drivers/timer.c" \
 "../drivers/uart0.c" 
 
 

@@ -20,7 +20,7 @@
 #define GREEN_LED PORTF,3
 #define PUSH_BUTTON PORTF,4
 
-bool isNetworkReady();
+bool isNetworkReady(void);
 void netstat(void);
 void readConfiguration(void);
 void runNetworkStack(void);

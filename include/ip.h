@@ -19,9 +19,9 @@
 #ifndef IP_H_
 #define IP_H_
 
+#include "eth0.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include "eth0.h"
 
 #pragma pack(push)
 #pragma pack(1)
@@ -49,6 +49,7 @@ typedef struct _ipHeader // 20 or more bytes
 
 extern const uint8_t EMPTY_IP_ADDRESS[IP_ADD_LENGTH];
 extern const uint8_t BROADCAST_IP_ADDRESS[IP_ADD_LENGTH];
+
 //-----------------------------------------------------------------------------
 // Subroutines
 //-----------------------------------------------------------------------------

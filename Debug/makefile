@@ -16,9 +16,11 @@ ORDERED_OBJS += \
 "./drivers/eth0.obj" \
 "./drivers/gpio.obj" \
 "./drivers/spi0.obj" \
-"./drivers/timer.obj" \
 "./drivers/uart0.obj" \
+"./libs/mqtt_client.obj" \
 "./libs/strlib.obj" \
+"./libs/timer.obj" \
+"./libs/wait.obj" \
 "./middleware/arp.obj" \
 "./middleware/dhcp.obj" \
 "./middleware/icmp.obj" \
@@ -28,11 +30,9 @@ ORDERED_OBJS += \
 "./middleware/tcp.obj" \
 "./middleware/udp.obj" \
 "./src/main.obj" \
-"./src/mqtt_client.obj" \
 "./src/network_stack.obj" \
 "./src/sensors.obj" \
 "./src/shell.obj" \
-"./src/wait.obj" \
 "../tm4c123gh6pm.cmd" \
 $(GEN_CMDS__FLAG) \
 -llibc.a \
@@ -173,8 +173,8 @@ HydraSense.out: $(OBJS) $(CMD_SRCS) $(GEN_CMDS)
 # Other Targets
 clean:
 	-$(RM) $(EXE_OUTPUTS__QUOTED)
-	-$(RM) "core\tm4c123gh6pm_startup_ccs.obj" "drivers\clock.obj" "drivers\eeprom.obj" "drivers\eth0.obj" "drivers\gpio.obj" "drivers\spi0.obj" "drivers\timer.obj" "drivers\uart0.obj" "libs\strlib.obj" "middleware\arp.obj" "middleware\dhcp.obj" "middleware\icmp.obj" "middleware\ip.obj" "middleware\mqtt.obj" "middleware\socket.obj" "middleware\tcp.obj" "middleware\udp.obj" "src\main.obj" "src\mqtt_client.obj" "src\network_stack.obj" "src\sensors.obj" "src\shell.obj" "src\wait.obj" 
-	-$(RM) "core\tm4c123gh6pm_startup_ccs.d" "drivers\clock.d" "drivers\eeprom.d" "drivers\eth0.d" "drivers\gpio.d" "drivers\spi0.d" "drivers\timer.d" "drivers\uart0.d" "libs\strlib.d" "middleware\arp.d" "middleware\dhcp.d" "middleware\icmp.d" "middleware\ip.d" "middleware\mqtt.d" "middleware\socket.d" "middleware\tcp.d" "middleware\udp.d" "src\main.d" "src\mqtt_client.d" "src\network_stack.d" "src\sensors.d" "src\shell.d" "src\wait.d" 
+	-$(RM) "core\tm4c123gh6pm_startup_ccs.obj" "drivers\clock.obj" "drivers\eeprom.obj" "drivers\eth0.obj" "drivers\gpio.obj" "drivers\spi0.obj" "drivers\uart0.obj" "libs\mqtt_client.obj" "libs\strlib.obj" "libs\timer.obj" "libs\wait.obj" "middleware\arp.obj" "middleware\dhcp.obj" "middleware\icmp.obj" "middleware\ip.obj" "middleware\mqtt.obj" "middleware\socket.obj" "middleware\tcp.obj" "middleware\udp.obj" "src\main.obj" "src\network_stack.obj" "src\sensors.obj" "src\shell.obj" 
+	-$(RM) "core\tm4c123gh6pm_startup_ccs.d" "drivers\clock.d" "drivers\eeprom.d" "drivers\eth0.d" "drivers\gpio.d" "drivers\spi0.d" "drivers\uart0.d" "libs\mqtt_client.d" "libs\strlib.d" "libs\timer.d" "libs\wait.d" "middleware\arp.d" "middleware\dhcp.d" "middleware\icmp.d" "middleware\ip.d" "middleware\mqtt.d" "middleware\socket.d" "middleware\tcp.d" "middleware\udp.d" "src\main.d" "src\network_stack.d" "src\sensors.d" "src\shell.d" 
 	-@echo 'Finished clean'
 	-@echo ' '
 

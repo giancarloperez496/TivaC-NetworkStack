@@ -110,6 +110,14 @@ bool stopTimer(uint8_t id) {
     return false;
 }
 
+bool restartTimer(uint8_t id) {
+    if (id < NUM_TIMERS) {
+        if (timers[id].active) {
+            timers[id].rem_time = timers[id].exp_time;
+        }
+    }
+}
+
 /*bool restartTimer(_callback callback) {
      uint8_t i = 0;
      bool found = false;

@@ -6,21 +6,39 @@ SHELL = cmd.exe
 
 # Add inputs and outputs from these tool invocations to the build variables 
 C_SRCS += \
-../libs/strlib.c 
+../libs/mqtt_client.c \
+../libs/strlib.c \
+../libs/timer.c \
+../libs/wait.c 
 
 C_DEPS += \
-./libs/strlib.d 
+./libs/mqtt_client.d \
+./libs/strlib.d \
+./libs/timer.d \
+./libs/wait.d 
 
 OBJS += \
-./libs/strlib.obj 
+./libs/mqtt_client.obj \
+./libs/strlib.obj \
+./libs/timer.obj \
+./libs/wait.obj 
 
 OBJS__QUOTED += \
-"libs\strlib.obj" 
+"libs\mqtt_client.obj" \
+"libs\strlib.obj" \
+"libs\timer.obj" \
+"libs\wait.obj" 
 
 C_DEPS__QUOTED += \
-"libs\strlib.d" 
+"libs\mqtt_client.d" \
+"libs\strlib.d" \
+"libs\timer.d" \
+"libs\wait.d" 
 
 C_SRCS__QUOTED += \
-"../libs/strlib.c" 
+"../libs/mqtt_client.c" \
+"../libs/strlib.c" \
+"../libs/timer.c" \
+"../libs/wait.c" 
 
 

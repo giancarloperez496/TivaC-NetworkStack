@@ -1,30 +1,39 @@
-// Socket Library
-// Jason Losh
-
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
-
-// Target Platform: -
-// Target uC:       -
-// System Clock:    -
-
-// Hardware configuration:
-// -
-
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
+/******************************************************************************
+ * File:        socket.h
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/7/24
+ *
+ * Description: -
+ ******************************************************************************/
 
 #ifndef SOCKET_H_
 #define SOCKET_H_
+
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
 #include "ip.h"
 #include "timer.h"
 #include <stdint.h>
 #include <stdbool.h>
 
+//=============================================================================
+// DEFINES AND MACROS
+//=============================================================================
+
 #define MAX_SOCKETS 10
+#define SOCKET_ERROR_MAX_MSG_LEN 60
+#define SOCKET_ERROR_NO_ERROR 0
+#define SOCKET_ERROR_ARP_TIMEOUT 1
+#define SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT 2
+#define SOCKET_ERROR_CONNECTION_RESET 3
+
+//=============================================================================
+// TYPEDEFS AND GLOBALS
+//=============================================================================
 
 // UDP/TCP socket
 typedef struct _socket {
@@ -46,14 +55,10 @@ typedef struct _socket {
     uint16_t flags;
     uint8_t assocTimer;
     bool retransmitting;
+    uint8_t connectAttempts;
     uint8_t  valid;
     _tim_callback_t errorCallback;
 } socket;
-
-#define SOCKET_ERROR_MAX_MSG_LEN 60
-#define SOCKET_ERROR_NO_ERROR 0
-#define SOCKET_ERROR_ARP_TIMEOUT 1
-#define SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT 2
 
 typedef struct socketError {
     uint8_t errorCode;
@@ -61,10 +66,9 @@ typedef struct socketError {
     char errorMsg[SOCKET_ERROR_MAX_MSG_LEN];
 } socketError;
 
-
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
+//=============================================================================
+// FUNCTION PROTOTYPES
+//=============================================================================
 
 void initSockets();
 socket* newSocket();

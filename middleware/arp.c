@@ -1,49 +1,56 @@
-// ARP Library
-// Jason Losh
+/******************************************************************************
+ * File:        arp.c
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/7/24
+ *
+ * Description: -
+ ******************************************************************************/
 
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
-// Target Platform: -
-// Target uC:       -
-// System Clock:    -
-
-// Hardware configuration:
-// -
-
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
-
+#include "uart0.h"
 #include "arp.h"
 #include "ip.h"
 #include <stdio.h>
+#include <stdint.h>
 
-// ------------------------------------------------------------------------------
-//  Globals
-// ------------------------------------------------------------------------------
+//=============================================================================
+// DEFINES AND MACROS
+//=============================================================================
 
-// ------------------------------------------------------------------------------
-//  Structures
-// ------------------------------------------------------------------------------
-
-
+//=============================================================================
+// GLOBALS
+//=============================================================================
 
 arp_entry_t arpTable[MAX_ARP_ENTRIES];
 uint8_t arpTableSize = 0;
-//-----------------------------------------------------------------------------
-// Subroutines
-//-----------------------------------------------------------------------------
 
-/*static uint32_t hash(uint8_t* ip) {
-    uint32_t hashValue = 0;
+//=============================================================================
+// PUBLIC FUNCTIONS
+//=============================================================================
+
+void displayArpTable() {
+    putsUart0("\nARP Cache\n------------------------------------------------------------\n");
+    putsUart0(" IP Address                  MAC Address\n");
     uint8_t i;
-    for (i = 0; i < IP_ADD_LENGTH; i++) {
-        hashValue += ip[i];
+    for (i = 0; i < MAX_ARP_ENTRIES; i++) {
+        if (arpTable[i].valid) {
+            uint8_t* ip = arpTable[i].ipAddress;
+            uint8_t* mac = arpTable[i].macAddress;
+            char ipStr[16];
+            char macStr[18];
+            snprintf(ipStr, 16, "%d.%d.%d.%d", ip[0], ip[1], ip[2], ip[3]);
+            snprintf(macStr, 18, "%02X:%02X:%02X:%02X:%02X:%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+            snprintf(out, MAX_UART_OUT, " %-28s%-20s\n", ipStr, macStr);
+            putsUart0(out);
+        }
     }
-    return hashValue % ARP_TABLE_SIZE;
-}*/
+    putsUart0("------------------------------------------------------------\n\n");
+}
 
 void addArpEntry(uint8_t ipAddress[], uint8_t macAddress[]) {
     //O(1) complexity
@@ -61,7 +68,9 @@ uint8_t lookupArpEntry(uint8_t ipAddress[], uint8_t macAddressToWrite[]) {
     for (i = 0; i < arpTableSize; i++) {
         if (isIpEqual(arpTable[i].ipAddress, ipAddress)) {
             //found given IP in ARP table
-            copyMacAddress(macAddressToWrite, arpTable[i].macAddress);
+            if (macAddressToWrite) {
+                copyMacAddress(macAddressToWrite, arpTable[i].macAddress);
+            }
             return 1;
         }
     }
