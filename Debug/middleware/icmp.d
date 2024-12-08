@@ -1,9 +1,9 @@
 # FIXED
 
 middleware/icmp.obj: ../middleware/icmp.c
-middleware/icmp.obj: C:/Users/gianc/IoT/HydraSense/include/icmp.h
-middleware/icmp.obj: C:/Users/gianc/IoT/HydraSense/include/ip.h
-middleware/icmp.obj: C:/Users/gianc/IoT/HydraSense/include/eth0.h
+middleware/icmp.obj: C:/Users/gianc/IoT/NetworkStack/include/icmp.h
+middleware/icmp.obj: C:/Users/gianc/IoT/NetworkStack/include/ip.h
+middleware/icmp.obj: C:/Users/gianc/IoT/NetworkStack/include/eth0.h
 middleware/icmp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdint.h
 middleware/icmp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_ti_config.h
 middleware/icmp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/linkage.h
@@ -20,11 +20,11 @@ middleware/icmp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/incl
 
 ../middleware/icmp.c:
 
-C:/Users/gianc/IoT/HydraSense/include/icmp.h:
+C:/Users/gianc/IoT/NetworkStack/include/icmp.h:
 
-C:/Users/gianc/IoT/HydraSense/include/ip.h:
+C:/Users/gianc/IoT/NetworkStack/include/ip.h:
 
-C:/Users/gianc/IoT/HydraSense/include/eth0.h:
+C:/Users/gianc/IoT/NetworkStack/include/eth0.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdint.h:
 

@@ -12,8 +12,8 @@ drivers/gpio.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include
 drivers/gpio.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 drivers/gpio.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
 drivers/gpio.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
-drivers/gpio.obj: C:/Users/gianc/IoT/HydraSense/include/tm4c123gh6pm.h
-drivers/gpio.obj: C:/Users/gianc/IoT/HydraSense/include/gpio.h
+drivers/gpio.obj: C:/Users/gianc/IoT/NetworkStack/include/tm4c123gh6pm.h
+drivers/gpio.obj: C:/Users/gianc/IoT/NetworkStack/include/gpio.h
 
 ../drivers/gpio.c:
 
@@ -39,7 +39,7 @@ C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
 
-C:/Users/gianc/IoT/HydraSense/include/tm4c123gh6pm.h:
+C:/Users/gianc/IoT/NetworkStack/include/tm4c123gh6pm.h:
 
-C:/Users/gianc/IoT/HydraSense/include/gpio.h:
+C:/Users/gianc/IoT/NetworkStack/include/gpio.h:
 

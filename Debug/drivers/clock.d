@@ -11,8 +11,8 @@ drivers/clock.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/includ
 drivers/clock.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_types.h
 drivers/clock.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 drivers/clock.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
-drivers/clock.obj: C:/Users/gianc/IoT/HydraSense/include/clock.h
-drivers/clock.obj: C:/Users/gianc/IoT/HydraSense/include/tm4c123gh6pm.h
+drivers/clock.obj: C:/Users/gianc/IoT/NetworkStack/include/clock.h
+drivers/clock.obj: C:/Users/gianc/IoT/NetworkStack/include/tm4c123gh6pm.h
 
 ../drivers/clock.c:
 
@@ -36,7 +36,7 @@ C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h:
 
-C:/Users/gianc/IoT/HydraSense/include/clock.h:
+C:/Users/gianc/IoT/NetworkStack/include/clock.h:
 
-C:/Users/gianc/IoT/HydraSense/include/tm4c123gh6pm.h:
+C:/Users/gianc/IoT/NetworkStack/include/tm4c123gh6pm.h:
 

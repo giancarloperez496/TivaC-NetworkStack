@@ -1,6 +1,12 @@
-//-----------------------------------------------------------------------------
-// Hardware Target
-//-----------------------------------------------------------------------------
+/******************************************************************************
+ * File:        main.c
+ *
+ * Author:      Giancarlo Perez
+ *
+ * Created:     12/7/24
+ *
+ * Description: Network Stack Main File
+ ******************************************************************************/
 
 // Target Platform: EK-TM4C123GXL w/ ENC28J60
 // Target uC:       TM4C123GH6PM
@@ -13,22 +19,13 @@
 //   SCLK (SSI0Clk) on PA2
 //   ~CS (SW controlled) on PA3
 //   WOL on PB3
+//   RESET on PB2
 //   INT on PC6
 
-// Pinning for IoT projects with wireless modules:
-// N24L01+ RF transceiver
-//   MOSI (SSI0Tx) on PA5
-//   MISO (SSI0Rx) on PA4
-//   SCLK (SSI0Clk) on PA2
-//   ~CS on PE0
-//   INT on PB2
-// Xbee module
-//   DIN (UART1TX) on PC5
-//   DOUT (UART1RX) on PC4
 
-//-----------------------------------------------------------------------------
-// Device includes, defines, and assembler directives
-//-----------------------------------------------------------------------------
+//=============================================================================
+// INCLUDES
+//=============================================================================
 
 /* Standard Libraries */
 #include <inttypes.h>
@@ -50,6 +47,10 @@
 #include "network_stack.h"
 #include "shell.h"
 #include "sensors.h"
+
+//=============================================================================
+// PUBLIC FUNCTIONS
+//=============================================================================
 
 // Initialize Hardware
 void initHw() {
@@ -79,15 +80,9 @@ void handlePublish(const mqttData* data) {
     }
 }
 
-void sampleIsr() {
-
-
-    //clear interrupt flag
-}
-
-//-----------------------------------------------------------------------------
-// Main
-//-----------------------------------------------------------------------------
+//=============================================================================
+// MAIN FUNCTION
+//=============================================================================
 
 //topics and behavior will be defind and set in here
 int main(void) {
@@ -112,9 +107,9 @@ int main(void) {
     initEeprom();
     readConfiguration();
 
+    //Init MQTT Client
     initMqttClient();
     setHandlePublishCallback(handlePublish);
-    //uint8_t printTimer = startPeriodicTimer(printSensorData, 5, NULL);
 
     while (true) {
         processShell();

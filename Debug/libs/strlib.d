@@ -1,7 +1,7 @@
 # FIXED
 
 libs/strlib.obj: ../libs/strlib.c
-libs/strlib.obj: C:/Users/gianc/IoT/HydraSense/include/strlib.h
+libs/strlib.obj: C:/Users/gianc/IoT/NetworkStack/include/strlib.h
 libs/strlib.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
 libs/strlib.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_ti_config.h
 libs/strlib.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/linkage.h
@@ -18,7 +18,7 @@ libs/strlib.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/
 
 ../libs/strlib.c:
 
-C:/Users/gianc/IoT/HydraSense/include/strlib.h:
+C:/Users/gianc/IoT/NetworkStack/include/strlib.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
 

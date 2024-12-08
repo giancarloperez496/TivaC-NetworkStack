@@ -1,7 +1,7 @@
 # FIXED
 
 middleware/arp.obj: ../middleware/arp.c
-middleware/arp.obj: C:/Users/gianc/IoT/HydraSense/include/uart0.h
+middleware/arp.obj: C:/Users/gianc/IoT/NetworkStack/include/uart0.h
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdint.h
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_ti_config.h
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/linkage.h
@@ -13,15 +13,15 @@ middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/inclu
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
-middleware/arp.obj: C:/Users/gianc/IoT/HydraSense/include/arp.h
-middleware/arp.obj: C:/Users/gianc/IoT/HydraSense/include/eth0.h
-middleware/arp.obj: C:/Users/gianc/IoT/HydraSense/include/ip.h
+middleware/arp.obj: C:/Users/gianc/IoT/NetworkStack/include/arp.h
+middleware/arp.obj: C:/Users/gianc/IoT/NetworkStack/include/eth0.h
+middleware/arp.obj: C:/Users/gianc/IoT/NetworkStack/include/ip.h
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdio.h
 middleware/arp.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdarg.h
 
 ../middleware/arp.c:
 
-C:/Users/gianc/IoT/HydraSense/include/uart0.h:
+C:/Users/gianc/IoT/NetworkStack/include/uart0.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdint.h:
 
@@ -45,11 +45,11 @@ C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
 
-C:/Users/gianc/IoT/HydraSense/include/arp.h:
+C:/Users/gianc/IoT/NetworkStack/include/arp.h:
 
-C:/Users/gianc/IoT/HydraSense/include/eth0.h:
+C:/Users/gianc/IoT/NetworkStack/include/eth0.h:
 
-C:/Users/gianc/IoT/HydraSense/include/ip.h:
+C:/Users/gianc/IoT/NetworkStack/include/ip.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdio.h:
 

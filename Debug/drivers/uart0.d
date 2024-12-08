@@ -12,9 +12,9 @@ drivers/uart0.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/includ
 drivers/uart0.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 drivers/uart0.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
 drivers/uart0.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
-drivers/uart0.obj: C:/Users/gianc/IoT/HydraSense/include/tm4c123gh6pm.h
-drivers/uart0.obj: C:/Users/gianc/IoT/HydraSense/include/uart0.h
-drivers/uart0.obj: C:/Users/gianc/IoT/HydraSense/include/gpio.h
+drivers/uart0.obj: C:/Users/gianc/IoT/NetworkStack/include/tm4c123gh6pm.h
+drivers/uart0.obj: C:/Users/gianc/IoT/NetworkStack/include/uart0.h
+drivers/uart0.obj: C:/Users/gianc/IoT/NetworkStack/include/gpio.h
 
 ../drivers/uart0.c:
 
@@ -40,9 +40,9 @@ C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
 
-C:/Users/gianc/IoT/HydraSense/include/tm4c123gh6pm.h:
+C:/Users/gianc/IoT/NetworkStack/include/tm4c123gh6pm.h:
 
-C:/Users/gianc/IoT/HydraSense/include/uart0.h:
+C:/Users/gianc/IoT/NetworkStack/include/uart0.h:
 
-C:/Users/gianc/IoT/HydraSense/include/gpio.h:
+C:/Users/gianc/IoT/NetworkStack/include/gpio.h:
 

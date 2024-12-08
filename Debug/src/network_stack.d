@@ -1,7 +1,7 @@
 # FIXED
 
 src/network_stack.obj: ../src/network_stack.c
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/network_stack.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/network_stack.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/_ti_config.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/linkage.h
@@ -13,27 +13,27 @@ src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/in
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_types.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/wait.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/eeprom.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/gpio.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/uart0.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/eth0.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/arp.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/ip.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/icmp.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/dhcp.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/udp.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/socket.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/timer.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/tcp.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/mqtt.h
-src/network_stack.obj: C:/Users/gianc/IoT/HydraSense/include/mqtt_client.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/wait.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/eeprom.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/gpio.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/uart0.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/eth0.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/arp.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/ip.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/icmp.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/dhcp.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/udp.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/socket.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/timer.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/tcp.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/mqtt.h
+src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/mqtt_client.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/xlocale/_string.h
 
 ../src/network_stack.c:
 
-C:/Users/gianc/IoT/HydraSense/include/network_stack.h:
+C:/Users/gianc/IoT/NetworkStack/include/network_stack.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdbool.h:
 
@@ -57,35 +57,35 @@ C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/machine/_stdint.h
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/sys/_stdint.h:
 
-C:/Users/gianc/IoT/HydraSense/include/wait.h:
+C:/Users/gianc/IoT/NetworkStack/include/wait.h:
 
-C:/Users/gianc/IoT/HydraSense/include/eeprom.h:
+C:/Users/gianc/IoT/NetworkStack/include/eeprom.h:
 
-C:/Users/gianc/IoT/HydraSense/include/gpio.h:
+C:/Users/gianc/IoT/NetworkStack/include/gpio.h:
 
-C:/Users/gianc/IoT/HydraSense/include/uart0.h:
+C:/Users/gianc/IoT/NetworkStack/include/uart0.h:
 
-C:/Users/gianc/IoT/HydraSense/include/eth0.h:
+C:/Users/gianc/IoT/NetworkStack/include/eth0.h:
 
-C:/Users/gianc/IoT/HydraSense/include/arp.h:
+C:/Users/gianc/IoT/NetworkStack/include/arp.h:
 
-C:/Users/gianc/IoT/HydraSense/include/ip.h:
+C:/Users/gianc/IoT/NetworkStack/include/ip.h:
 
-C:/Users/gianc/IoT/HydraSense/include/icmp.h:
+C:/Users/gianc/IoT/NetworkStack/include/icmp.h:
 
-C:/Users/gianc/IoT/HydraSense/include/dhcp.h:
+C:/Users/gianc/IoT/NetworkStack/include/dhcp.h:
 
-C:/Users/gianc/IoT/HydraSense/include/udp.h:
+C:/Users/gianc/IoT/NetworkStack/include/udp.h:
 
-C:/Users/gianc/IoT/HydraSense/include/socket.h:
+C:/Users/gianc/IoT/NetworkStack/include/socket.h:
 
-C:/Users/gianc/IoT/HydraSense/include/timer.h:
+C:/Users/gianc/IoT/NetworkStack/include/timer.h:
 
-C:/Users/gianc/IoT/HydraSense/include/tcp.h:
+C:/Users/gianc/IoT/NetworkStack/include/tcp.h:
 
-C:/Users/gianc/IoT/HydraSense/include/mqtt.h:
+C:/Users/gianc/IoT/NetworkStack/include/mqtt.h:
 
-C:/Users/gianc/IoT/HydraSense/include/mqtt_client.h:
+C:/Users/gianc/IoT/NetworkStack/include/mqtt_client.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h:
 
