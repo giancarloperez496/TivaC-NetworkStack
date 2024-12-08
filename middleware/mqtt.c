@@ -239,7 +239,7 @@ void sendMqttSubAck(mqttClient* client) {
 
 void sendMqttUnsubscribe(mqttClient* client, char strTopic[]) {
     mqttHeader* mqtt = (mqttHeader*)mqttBuffer;
-    mqttOptions* opt = &client->options;
+    //mqttOptions* opt = &client->options;
     uint32_t i = 0;
     mqtt->flags = (MQTT_UNSUBSCRIBE << 4) | 0b0010;
     mqtt->data[i++] = 0;

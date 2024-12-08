@@ -39,7 +39,7 @@ void initTimer();
 uint8_t startOneshotTimer(_tim_callback_t callback, uint32_t seconds, void* context);
 uint8_t startPeriodicTimer(_tim_callback_t callback, uint32_t seconds, void* context);
 bool stopTimer(uint8_t id);
-//bool restartTimer(_tim_callback_t callback);
+bool restartTimer(uint8_t id);
 void tickIsr();
 uint32_t random32();
 

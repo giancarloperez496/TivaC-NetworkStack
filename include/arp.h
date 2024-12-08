@@ -54,6 +54,7 @@ extern arp_entry_t arpTable[MAX_ARP_ENTRIES];
 // FUNCTION PROTOTYPES
 //=============================================================================
 
+void displayArpTable();
 void addArpEntry(uint8_t ipAddress[], uint8_t macAddress[]);
 uint8_t lookupArpEntry(uint8_t ipAddress[], uint8_t macAddressToWrite[]);
 bool isArpRequest(etherHeader* ether);

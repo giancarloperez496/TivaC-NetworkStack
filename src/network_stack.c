@@ -12,6 +12,7 @@
 #include "tcp.h"
 #include "mqtt.h"
 #include "mqtt_client.h"
+#include <stdio.h>
 #include <string.h>
 
 uint8_t buffer[MAX_PACKET_SIZE];

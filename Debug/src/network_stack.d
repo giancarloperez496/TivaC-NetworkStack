@@ -28,6 +28,8 @@ src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/timer.h
 src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/tcp.h
 src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/mqtt.h
 src/network_stack.obj: C:/Users/gianc/IoT/NetworkStack/include/mqtt_client.h
+src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdio.h
+src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdarg.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h
 src/network_stack.obj: C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/xlocale/_string.h
 
@@ -86,6 +88,10 @@ C:/Users/gianc/IoT/NetworkStack/include/tcp.h:
 C:/Users/gianc/IoT/NetworkStack/include/mqtt.h:
 
 C:/Users/gianc/IoT/NetworkStack/include/mqtt_client.h:
+
+C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdio.h:
+
+C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/stdarg.h:
 
 C:/ti/ccs1240/ccs/tools/compiler/ti-cgt-arm_20.2.7.LTS/include/string.h:
 
