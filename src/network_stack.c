@@ -186,8 +186,13 @@ void processUdpData(etherHeader* data) {
 void processIcmpData(etherHeader* data) {
     if (isIp(data)) {
         if (isIpUnicast(data)) {
+            icmpEchoResponse r;
             if (isPingRequest(data)) {
                 sendPingResponse(data);
+            }
+            else if (isPingResponse(data, &r)) {
+                snprintf(out, MAX_UART_OUT, "Reply from %d.%d.%d.%d: bytes=%d time=%dms TTL=%d\n", r.remoteIp[0], r.remoteIp[1], r.remoteIp[2], r.remoteIp[3], r.bytes, r.ms, r.ttl);
+                putsUart0(out);
             }
         }
     }
@@ -204,6 +209,7 @@ void processArpData(etherHeader* data) {
         }
         processDhcpArpResponse(data);
         processTcpArpResponse(data);
+        processIcmpArpResponse(data);
     }
 }
 

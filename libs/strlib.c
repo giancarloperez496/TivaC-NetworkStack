@@ -40,6 +40,7 @@ char* str_char(const char* str, char c) {
     return NULL;
 }
 
+//src MUST be null terminated
 void str_copy(char dest[], const char* src) {
     uint32_t i;
     for (i = 0; src[i] != 0; i++) {

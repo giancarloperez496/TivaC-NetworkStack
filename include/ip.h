@@ -47,6 +47,8 @@ typedef struct _ipHeader // 20 or more bytes
 #define PROTOCOL_TCP  6
 #define PROTOCOL_UDP  17
 
+#define MAX_PACKET_SIZE 1518
+
 extern const uint8_t EMPTY_IP_ADDRESS[IP_ADD_LENGTH];
 extern const uint8_t BROADCAST_IP_ADDRESS[IP_ADD_LENGTH];
 
@@ -55,7 +57,7 @@ extern const uint8_t BROADCAST_IP_ADDRESS[IP_ADD_LENGTH];
 //-----------------------------------------------------------------------------
 
 bool isIp(etherHeader *ether);
-ipHeader* getIpHeader(etherHeader* ether);
+inline ipHeader* getIpHeader(etherHeader* ether);
 bool isIpUnicast(etherHeader *ether);
 bool isIpValid();
 bool isIpEqual(uint8_t ip1[4], uint8_t ip2[4]);

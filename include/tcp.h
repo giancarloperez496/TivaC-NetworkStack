@@ -57,7 +57,6 @@
 
 /* Constants */
 #define MAX_SEGMENT_SIZE 1460
-#define MAX_PACKET_SIZE 1518
 
 /* Config */
 #define WINDOW_SIZE 1284

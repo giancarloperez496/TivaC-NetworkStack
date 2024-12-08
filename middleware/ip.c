@@ -58,7 +58,7 @@ bool isIpValid(uint8_t ip[4]) {
     return ip[0] || ip[1] || ip[2] || ip[3];
 }
 
-ipHeader* getIpHeader(etherHeader* ether) {
+inline ipHeader* getIpHeader(etherHeader* ether) {
     return (ipHeader*)ether->data;
 }
 

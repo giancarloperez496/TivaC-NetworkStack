@@ -15,7 +15,6 @@
 char strInput[MAX_CHARS+1];
 uint8_t count = 0;
 
-extern mqttClient* mqclient;
 extern arp_entry_t arpTable[MAX_ARP_ENTRIES];
 
 uint8_t asciiToUint8(const char str[]) {
@@ -220,7 +219,7 @@ void processShell() {
                     token = str_tokenize(NULL, " .");
                     ip[i] = asciiToUint8(token);
                 }
-                //sendPingRequest(ip);
+                ping(ip);
             }
             if (str_equal(token, "reboot")) {
                 resetEther();
@@ -274,8 +273,6 @@ void processShell() {
                     writeEeprom(EEPROM_TIME, *p32);
                 }
                 if (str_equal(token, "mqtt")) {
-                    //mqttClient* mqclient = getMqttClient();
-                    //socket* s = getMqttSocket(mqclient);
                     for (i = 0; i < IP_ADD_LENGTH; i++) {
                         token = str_tokenize(NULL, " .");
                         ip[i] = asciiToUint8(token);
