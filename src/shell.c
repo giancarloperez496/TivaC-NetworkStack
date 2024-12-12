@@ -162,27 +162,14 @@ void processShell() {
                     disableDhcp();
                     writeEeprom(EEPROM_DHCP, 0);
                 }
-                else
+                else {
                     putsUart0("Error in dhcp argument\r");
+                }
             }
             if (str_equal(token, "mqtt")) {
                 token = str_tokenize(NULL, " ");
                 if (str_equal(token, "connect")) {
-                    //setMqttClientState(&mq, MQTT_CLIENT_STATE_INIT);
                     connectMqtt();
-
-                    //uint8_t retcode = connectMqtt(ether);
-                    //connectMqtt();
-                    /*switch (retcode) {
-                    case MQTT_OK:
-                        break;
-                    case MQTT_CONNECT_ERROR_INVALID_SOCKET:
-                        putsUart0("Error connecting to MQTT Broker: Invalid socket\n");
-                        break;
-                    case MQTT_CONNECT_ERROR_INVALID_STATE:
-                        putsUart0("Error connecting to MQTT Broker: Invalid state\n");
-                        break;
-                    }*/
                 }
                 if (str_equal(token, "disconnect")) {
                     disconnectMqtt();
@@ -211,7 +198,13 @@ void processShell() {
                 netstat();
             }
             if (str_equal(token, "arp")) {
-                displayArpTable();
+                token = str_tokenize(NULL, " ");
+                if (str_equal(token, "clear")) {
+                    clearArpTable();
+                }
+                else {
+                    displayArpTable();
+                }
             }
             if (str_equal(token, "ping")) {
                 for (i = 0; i < IP_ADD_LENGTH; i++)

@@ -33,27 +33,6 @@
 // STATIC FUNCTIONS
 //=============================================================================
 
-//this function shall be called anytime an error occurs and the application needs to be aware of it
-static void handleSocketError(socket* s, uint8_t errorCode) {
-    socketError err;
-    err.errorCode = errorCode;
-    switch (errorCode) {
-    case SOCKET_ERROR_ARP_TIMEOUT:
-        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "Could not reach %d.%d.%d.%d (timed out)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
-        break;
-    case SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT:
-        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "No response from %d.%d.%d.%d (timed out)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
-        break;
-    case SOCKET_ERROR_CONNECTION_RESET:
-        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "Connection was reset by remote host (%d.%d.%d.%d:%d)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3], s->remotePort);
-        break;
-    }
-    err.sk = s;
-    if (s->errorCallback) {
-        s->errorCallback(&err); // application responsible for deleting socket in the case of an error
-    }
-}
-
 static void tcpConnectionRstCallback(socket* s) {
     //stop timers
     //set state to closed
@@ -61,7 +40,7 @@ static void tcpConnectionRstCallback(socket* s) {
     //delete socket
     stopTimer(s->assocTimer);
     setTcpState(s, TCP_CLOSED);
-    handleSocketError(s, SOCKET_ERROR_CONNECTION_RESET);
+    throwSocketError(s, SOCKET_ERROR_CONNECTION_RESET);
     //s->connectAttempts = 0;
 }
 
@@ -72,18 +51,18 @@ static void tcpTimeoutCallback(void* context) {
     if (s) {
         s->assocTimer = INVALID_TIMER;
         switch (s->state) {
-        case TCP_CLOSED:
+        /*case TCP_CLOSED:
             //arping timed out
             handleSocketError(s, SOCKET_ERROR_ARP_TIMEOUT);
             setTcpState(s, TCP_CLOSED);
-            break;
+            break;*/
         case TCP_SYN_SENT:
             //synack timed out
             s->connectAttempts++;
             if (s->connectAttempts == TCP_MAX_SYN_ATTEMPTS) {
                 //putsUart0("Failed to connect to server\n");
                 s->connectAttempts = 0;
-                handleSocketError(s, SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT);
+                throwSocketError(s, SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT);
                 setTcpState(s, TCP_CLOSED);
             }
             else {
@@ -100,7 +79,7 @@ static void tcpTimeoutCallback(void* context) {
 
 }
 
-static void completeTcpConCallback(etherHeader* ether, socket* s) {
+static void completeTcpConCallback(/*etherHeader* ether, */socket* s) {
     uint32_t ISN = random32();
     s->sequenceNumber = ISN;
     s->acknowledgementNumber = 0;
@@ -305,25 +284,22 @@ bool isTcpRst(etherHeader* ether) {
     putsUart0(out);
 }*/
 
-void openTcpConnection(etherHeader* ether, socket* s) {
-    uint8_t localIp[4];
-    uint8_t subnetMask[4];
-    uint8_t gateway[4];
-    uint8_t remoteMac[6];
-    getIpAddress(localIp);
-    getIpSubnetMask(subnetMask);
-    getIpGatewayAddress(gateway);
-    bool isIpLocal = isIpInSubnet(localIp, s->remoteIpAddress, subnetMask);
-    uint8_t arpEntryExists = lookupArpEntry(s->remoteIpAddress, remoteMac);
-    if (arpEntryExists) {
-        copyMacAddress(s->remoteHwAddress, remoteMac);
-        completeTcpConCallback(ether, s);
+void tcpArpResCallback(arpRespContext resp) {
+    //when we get the MAC address
+    socket* s = (socket*)resp.ctxt;
+    copyMacAddress(s->remoteHwAddress, resp.responseMacAddress);
+    if (resp.success) {
+        completeTcpConCallback(s);
     }
     else {
-        sendArpRequest(ether, localIp, isIpLocal ? s->remoteIpAddress : gateway); //if IP is in same subnet, send ARP for that IP, else send ARP to gateway
-        uint8_t arpTimer = startOneshotTimer(tcpTimeoutCallback, TCP_ARP_TIMEOUT, s); //wait 30 seconds for arp
-        s->assocTimer = arpTimer; //assign timer id to socket or local port (multiple ways to do this)
+        //if ARP function responded with error (timed out)
+        throwSocketError(s, SOCKET_ERROR_ARP_TIMEOUT);
+        setTcpState(s, TCP_CLOSED);
     }
+}
+
+void openTcpConnection(etherHeader* ether, socket* s) {
+    resolveMacAddress(s->remoteIpAddress, tcpArpResCallback, s);
 }
 
 void closeTcpConnection(etherHeader* ether, socket* s) {
@@ -482,7 +458,7 @@ void processTcpResponse(etherHeader* ether) {
 }
 
 void processTcpArpResponse(etherHeader* ether) {
-    uint32_t i;
+    /*uint32_t i;
     arpPacket* arp = getArpPacket(ether);
     socket* sockets = getSockets();
     for (i = 0; i < MAX_SOCKETS; i++) {
@@ -497,7 +473,7 @@ void processTcpArpResponse(etherHeader* ether) {
                 break;
             }
         }
-    }
+    }*/
 }
 
 void pendTcpResponse(socket* s, uint8_t flags) {

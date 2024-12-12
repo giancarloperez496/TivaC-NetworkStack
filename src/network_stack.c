@@ -203,13 +203,10 @@ void processArpData(etherHeader* data) {
         sendArpResponse(data);
     }
     if (isArpResponse(data)) {
-        arpPacket* arp = getArpPacket(data);
-        if (!lookupArpEntry(arp->sourceIp, NULL)) {
-            addArpEntry(arp->sourceIp, arp->sourceAddress);
-        }
+        processArpResponse(data);
         processDhcpArpResponse(data);
-        processTcpArpResponse(data);
-        processIcmpArpResponse(data);
+        //processTcpArpResponse(data);
+        //processIcmpArpResponse(data);
     }
 }
 

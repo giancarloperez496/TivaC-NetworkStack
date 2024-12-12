@@ -30,6 +30,15 @@
 // TYPEDEFS AND GLOBALS
 //=============================================================================
 
+typedef struct _arpRespContext {
+    uint8_t success;
+    //uint8_t remoteIpAddress[4];
+    uint8_t responseMacAddress[6];
+    void* ctxt;
+} arpRespContext;
+
+typedef void (*_arp_callback_t)(arpRespContext);
+
 typedef struct _arpPacket { // 28 bytes
   uint16_t hardwareType;
   uint16_t protocolType;
@@ -48,6 +57,16 @@ typedef struct {
     uint8_t valid;
 } arp_entry_t;
 
+typedef struct _arpRequest {
+    uint8_t ipAdd[4];
+    uint8_t hwAdd[6];
+    uint8_t attempts;
+    uint8_t arpTimer;
+    void* ctxt;
+    _arp_callback_t callback;
+} arpRequest;
+
+
 extern arp_entry_t arpTable[MAX_ARP_ENTRIES];
 
 //=============================================================================
@@ -55,11 +74,13 @@ extern arp_entry_t arpTable[MAX_ARP_ENTRIES];
 //=============================================================================
 
 void displayArpTable();
+void clearArpTable();
 void addArpEntry(uint8_t ipAddress[], uint8_t macAddress[]);
 uint8_t lookupArpEntry(uint8_t ipAddress[], uint8_t macAddressToWrite[]);
 bool isArpRequest(etherHeader* ether);
 bool isArpResponse(etherHeader *ether);
-arpPacket* getArpPacket(etherHeader* ether);
+inline arpPacket* getArpPacket(etherHeader* ether);
+void resolveMacAddress(uint8_t ipAdd[4], _arp_callback_t cb, void* ctxt);
 void sendArpResponse(etherHeader *ether);
 void sendArpRequest(etherHeader *ether, uint8_t ipFrom[], uint8_t ipTo[]);
 

@@ -256,7 +256,7 @@ void connectMqtt() {
     uint8_t mqserv[4];
     switch (mqttState) {
     case MQTT_CLIENT_STATE_DISCONNECTED:
-        client->socket = newSocket();
+        client->socket = newSocket(SOCKET_STREAM);
         client->socket->errorCallback = socketErrorCallback;
         getIpMqttBrokerAddress(mqserv);
         snprintf(out, MAX_UART_OUT, "MQTT Client: Connecting to MQTT server %d.%d.%d.%d:%d\n", mqserv[0], mqserv[1], mqserv[2], mqserv[3], MQTT_PORT);

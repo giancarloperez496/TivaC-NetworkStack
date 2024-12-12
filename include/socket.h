@@ -24,12 +24,20 @@
 // DEFINES AND MACROS
 //=============================================================================
 
-#define MAX_SOCKETS 10
+/* Socket Types */
+#define SOCKET_STREAM 0 //TCP
+#define SOCKET_DGRAM 1 //UDP
+#define SOCKET_RAW 2 //raw (ICMP, ARP)
+
+
+/* Socket Errors */
 #define SOCKET_ERROR_MAX_MSG_LEN 60
 #define SOCKET_ERROR_NO_ERROR 0
 #define SOCKET_ERROR_ARP_TIMEOUT 1
 #define SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT 2
 #define SOCKET_ERROR_CONNECTION_RESET 3
+
+#define MAX_SOCKETS 10
 
 //=============================================================================
 // TYPEDEFS AND GLOBALS
@@ -38,6 +46,7 @@
 // UDP/TCP socket
 typedef struct _socket {
     //uint8_t socket_id;
+    uint8_t type;
     uint8_t  localIpAddress[4];
     uint16_t localPort;
     uint8_t  remoteIpAddress[4];
@@ -56,6 +65,7 @@ typedef struct _socket {
     uint8_t assocTimer;
     bool retransmitting;
     uint8_t connectAttempts;
+    //
     uint8_t  valid;
     _tim_callback_t errorCallback;
 } socket;
@@ -71,7 +81,7 @@ typedef struct socketError {
 //=============================================================================
 
 void initSockets();
-socket* newSocket();
+socket* newSocket(uint8_t type);
 void deleteSocket(socket *s);
 void initSocket(socket* s, uint8_t remoteIp[], uint16_t remotePort);
 socket* getSockets();
@@ -85,6 +95,8 @@ void getSocketInfoFromArpResponse(etherHeader* ether, socket* s);
 void getSocketInfoFromArpResponse(etherHeader* ether, socket* s);
 void getSocketInfoFromUdpPacket(etherHeader* ether, socket* s);
 void getSocketInfoFromTcpPacket(etherHeader* ether, socket* s);
+void throwSocketError(socket* s, uint8_t errorCode);
+
 
 #endif
 

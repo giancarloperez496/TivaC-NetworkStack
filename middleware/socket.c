@@ -45,7 +45,7 @@ void initSockets(void) {
     }
 }
 
-socket* newSocket(void) {
+socket* newSocket(uint8_t type) {
     uint8_t i = 0;
     socket* s = NULL;
     bool foundUnused = false;
@@ -54,6 +54,7 @@ socket* newSocket(void) {
         if (foundUnused) {
             sockets[i].valid = 1;
             s = &sockets[i];
+            s->type = type;
             socketCount++;
         }
         i++;
@@ -111,34 +112,54 @@ void socketRecvFrom() {
 
 
 void socketConnectTcp(socket* s, uint8_t serverIp[4], uint16_t port) {
-    uint8_t buffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)buffer;
-    getIpAddress(s->localIpAddress);
-    s->localPort = (random32() & 0x3FFF) + 49152;
-    copyIpAddress(s->remoteIpAddress, serverIp);
-    s->remotePort = port;
-    openTcpConnection(ether, s);
+    if (s->type == SOCKET_STREAM) {
+        uint8_t buffer[MAX_PACKET_SIZE];
+        etherHeader* ether = (etherHeader*)buffer;
+        getIpAddress(s->localIpAddress);
+        s->localPort = (random32() & 0x3FFF) + 49152;
+        copyIpAddress(s->remoteIpAddress, serverIp);
+        s->remotePort = port;
+        openTcpConnection(ether, s);
+    }
+    else {
+        //not a tcp socket
+    }
 }
 
 void socketSendTcp(socket* s, uint8_t* data, uint16_t length) {
-    uint8_t buffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)buffer;
-    //updateSeqNum(s, ether)
-    //memcpy(s->tx_buffer, data, length);
-    //s->tx_size = length;
-    sendTcpMessage(ether, s, PSH | ACK, data, length);
-    s->sequenceNumber += length;
+    if (s->type == SOCKET_STREAM) {
+        uint8_t buffer[MAX_PACKET_SIZE];
+        etherHeader* ether = (etherHeader*)buffer;
+        //updateSeqNum(s, ether)
+        //memcpy(s->tx_buffer, data, length);
+        //s->tx_size = length;
+        sendTcpMessage(ether, s, PSH | ACK, data, length);
+        s->sequenceNumber += length;
+    }
+    else {
+        //not a TCP socket
+    }
 }
 
 /*uint16_t socketRecvTcp(socket* s, uint8_t* buf) {
+    if (s->type == SOCKET_STREAM) {
 
+    }
+    else {
+
+    }
     return 1;
 }*/
 
 void socketCloseTcp(socket* s) {
-    uint8_t buffer[MAX_PACKET_SIZE];
-    etherHeader* ether = (etherHeader*)buffer;
-    closeTcpConnection(ether, s);
+    if (s->type == SOCKET_STREAM) {
+        uint8_t buffer[MAX_PACKET_SIZE];
+        etherHeader* ether = (etherHeader*)buffer;
+        closeTcpConnection(ether, s);
+    }
+    else {
+
+    }
 }
 
 // Get socket from ephemeral port, may expand this in the future to get socket from all fields
@@ -188,4 +209,25 @@ void getSocketInfoFromTcpPacket(etherHeader* ether, socket* s) {
         s->remoteIpAddress[i] = ip->sourceIp[i];
     s->remotePort = ntohs(tcp->sourcePort);
     s->localPort = ntohs(tcp->destPort);
+}
+
+//this function shall be called anytime an error occurs and the application needs to be aware of it
+void throwSocketError(socket* s, uint8_t errorCode) {
+    socketError err;
+    err.errorCode = errorCode;
+    switch (errorCode) {
+    case SOCKET_ERROR_ARP_TIMEOUT:
+        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "Could not reach %d.%d.%d.%d (timed out)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
+        break;
+    case SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT:
+        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "No response from %d.%d.%d.%d (timed out)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3]);
+        break;
+    case SOCKET_ERROR_CONNECTION_RESET:
+        snprintf(err.errorMsg, SOCKET_ERROR_MAX_MSG_LEN, "Connection was reset by remote host (%d.%d.%d.%d:%d)", s->remoteIpAddress[0], s->remoteIpAddress[1], s->remoteIpAddress[2], s->remoteIpAddress[3], s->remotePort);
+        break;
+    }
+    err.sk = s;
+    if (s->errorCallback) {
+        s->errorCallback(&err); // application responsible for deleting socket in the case of an error
+    }
 }

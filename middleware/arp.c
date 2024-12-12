@@ -15,6 +15,7 @@
 #include "uart0.h"
 #include "arp.h"
 #include "ip.h"
+#include "timer.h"
 #include <stdio.h>
 #include <stdint.h>
 
@@ -22,12 +23,18 @@
 // DEFINES AND MACROS
 //=============================================================================
 
+#define ARP_RETRY_SECONDS 1
+#define MAX_ARP_ATTEMPTS 3
+#define MAX_ARP_REQUESTS 5
+
 //=============================================================================
 // GLOBALS
 //=============================================================================
 
 arp_entry_t arpTable[MAX_ARP_ENTRIES];
 uint8_t arpTableSize = 0;
+arpRequest arpReqs[MAX_ARP_REQUESTS];
+uint8_t arpReqsSize = 0;
 
 //=============================================================================
 // PUBLIC FUNCTIONS
@@ -50,6 +57,14 @@ void displayArpTable() {
         }
     }
     putsUart0("------------------------------------------------------------\n\n");
+}
+
+void clearArpTable() {
+    uint8_t i;
+    for (i = 0; i < MAX_ARP_ENTRIES; i++) {
+        arpTable[i].valid = 0;
+        arpTableSize = 0;
+    }
 }
 
 void addArpEntry(uint8_t ipAddress[], uint8_t macAddress[]) {
@@ -95,10 +110,104 @@ bool isArpRequest(etherHeader* ether) {
     return ok;
 }
 
+void arpTimeoutCallback(void* c) {
+    arpRequest* arpReq = (arpRequest*)c;
+    arpReq->attempts++;
+    if (arpReq->attempts == MAX_ARP_ATTEMPTS) {
+        arpReq->attempts = 0;
+        stopTimer(arpReq->arpTimer);
+        arpRespContext resp;
+        resp.success = 0;
+        resp.ctxt = arpReq->ctxt;
+        if (arpReq->callback) {
+            arpReq->callback(resp); //mac address invalid
+        }
+    }
+    else {
+        //Nth arp attempt...
+        uint8_t ether[MAX_PACKET_SIZE];
+        uint8_t localIp[IP_ADD_LENGTH];
+        getIpAddress(localIp);
+        sendArpRequest((etherHeader*)ether, localIp, arpReq->ipAdd); // 192.168.1.75 -> 192.168.1.163
+    }
+}
+
+/*
+TEMPLATE FUNCTION FOR RESOLVEMACADDRESS CALLBACK
+
+void arpResolutionCallback(arpRespContext resp) {
+    //when we get the MAC address
+    uint8_t mac[6];
+    copyMacAddress(mac, resp.responseMacAddress);
+    if (resp.success) {
+        //if MAC was retrieved
+    }
+    else {
+        //if timed out
+    }
+}
+ */
+
+//ctxt must consist between loops
+void resolveMacAddress(uint8_t ipAdd[4], _arp_callback_t cb, void* ctxt) {
+    uint8_t localIp[4];
+    uint8_t subnetMask[4];
+    uint8_t gateway[4];
+    uint8_t remoteMac[6];
+    getIpAddress(localIp);
+    getIpSubnetMask(subnetMask);
+    getIpGatewayAddress(gateway);
+    bool isIpLocal = isIpInSubnet(localIp, ipAdd, subnetMask);
+    uint8_t arpEntryExists = lookupArpEntry(isIpLocal ? ipAdd : gateway, remoteMac);
+    if (arpEntryExists) {
+        arpRespContext resp;
+        resp.success = 1;
+        copyMacAddress(resp.responseMacAddress, remoteMac); //return MAC if exists in table
+        resp.ctxt = ctxt;
+        cb(resp);
+    }
+    else {
+        uint8_t ether[MAX_PACKET_SIZE];
+        arpRequest req;
+        copyIpAddress(req.ipAdd, isIpLocal ? ipAdd : gateway); //if local use local IP otherwise target is gateway, this will make line 178 work. arp does not care aobut the external IP just the requested one
+        req.callback = cb;
+        req.attempts = 0;
+        req.arpTimer = startPeriodicTimer(arpTimeoutCallback, ARP_RETRY_SECONDS, &arpReqs[arpReqsSize]); //wait 3 seconds for arp
+        req.ctxt = ctxt;
+        arpReqs[arpReqsSize++] = req; //add req to list
+        sendArpRequest((etherHeader*)ether, localIp, isIpLocal ? ipAdd : gateway); //if IP is in same subnet, send ARP for that IP, else send ARP to gateway
+    }
+}
+
+void processArpResponse(etherHeader* ether) {
+    uint8_t i, j;
+    arpPacket* arp = getArpPacket(ether);
+    if (!lookupArpEntry(arp->sourceIp, NULL)) { //if entry DNE, add it
+        addArpEntry(arp->sourceIp, arp->sourceAddress);
+    }
+    for (i = 0; i < MAX_ARP_REQUESTS; i++) {
+        if (isIpEqual(arpReqs[i].ipAdd, arp->sourceIp)) { //if this response is a response to one of our requests, call the request callback
+            //found the arp request, stop timer;
+            stopTimer(arpReqs[i].arpTimer);
+            //respond with success code and resolved MAC along w context
+            arpRespContext resp;
+            resp.success = 1;
+            copyMacAddress(resp.responseMacAddress, arp->sourceAddress);
+            resp.ctxt = arpReqs[i].ctxt;
+            arpReqs[i].callback(resp); //application should also check??? if target ip is external, response mac address will be router;
+            //remove the request from the list
+            for (j = i; j < arpReqsSize - 1; j++) {
+                arpReqs[j] = arpReqs[j + 1];
+            }
+            arpReqsSize--;
+            break;
+        }
+    }
+}
+
 // Determines whether packet is ARP response
-bool isArpResponse(etherHeader *ether)
-{
-    arpPacket *arp = (arpPacket*)ether->data;
+bool isArpResponse(etherHeader *ether) {
+    arpPacket* arp = getArpPacket(ether);
     bool ok;
     ok = (ether->frameType == htons(TYPE_ARP));
     if (ok)
