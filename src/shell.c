@@ -286,11 +286,13 @@ void processShell() {
             }
             if (str_equal(token, "help")) {
                 putsUart0("Commands:\n");
+                putsUart0("  arp [clear]\n");
                 putsUart0("  dhcp on|off|renew|release\n");
                 putsUart0("  mqtt ACTION [USER [PASSWORD]]\n");
                 putsUart0("    where ACTION = {connect|disconnect|publish TOPIC DATA\n");
                 putsUart0("                   |subscribe TOPIC|unsubscribe TOPIC}\n");
-                putsUart0("  ip\n");
+                putsUart0("  ipconfig\n");
+                putsUart0("  netstat\n");
                 putsUart0("  ping w.x.y.z\n");
                 putsUart0("  reboot\n");
                 putsUart0("  set ip|gw|dns|time|mqtt|sn w.x.y.z\n");
