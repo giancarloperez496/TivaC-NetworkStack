@@ -33,6 +33,52 @@
 // STATIC FUNCTIONS
 //=============================================================================
 
+static bool isTcpSyn(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    if (!isTcp(ether)) {
+        return false;
+    }
+    return htons(tcp->offsetFields) & SYN;
+}
+
+static bool isTcpAck(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    if (!isTcp(ether)) {
+        return false;
+    }
+    return htons(tcp->offsetFields) & ACK;
+}
+
+static bool isTcpFin(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    return isTcp(ether) && (htons(tcp->offsetFields) & FIN);
+}
+
+static bool isTcpPsh(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    if (!isTcp(ether)) {
+        return false;
+    }
+    return htons(tcp->offsetFields) & PSH;
+}
+
+static bool isTcpRst(etherHeader* ether) {
+    ipHeader* ip = (ipHeader*)ether->data;
+    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
+    if (!isTcp(ether)) {
+        return false;
+    }
+    return htons(tcp->offsetFields) & RST;
+}
+
+static inline void pendTcpResponse(socket* s, uint8_t flags) {
+    s->flags = flags;
+}
+
 static void tcpConnectionRstCallback(socket* s) {
     //stop timers
     //set state to closed
@@ -159,6 +205,20 @@ static void updateAckNum(socket* s, etherHeader* ether) {
     }
 }
 
+static void tcpArpResCallback(arpRespContext resp) {
+    //when we get the MAC address
+    socket* s = (socket*)resp.ctxt;
+    copyMacAddress(s->remoteHwAddress, resp.responseMacAddress);
+    if (resp.success) {
+        completeTcpConCallback(s);
+    }
+    else {
+        //if ARP function responded with error (timed out)
+        throwSocketError(s, SOCKET_ERROR_ARP_TIMEOUT);
+        setTcpState(s, TCP_CLOSED);
+    }
+}
+
 //=============================================================================
 // PUBLIC FUNCTIONS
 //=============================================================================
@@ -198,20 +258,6 @@ uint16_t getTcpDataLength(etherHeader* ether) {
     return payload_length;
 }
 
-bool isTcpPortOpen(etherHeader* ether) {
-    tcpHeader* tcp = getTcpHeader(ether);
-    uint16_t port = ntohs(tcp->destPort);
-    int i;
-    socket* sockets = getSockets();
-    for (i = 0; i < MAX_SOCKETS; i++) {
-        socket* s = &sockets[i];
-        if (s->localPort == port && s->state != TCP_CLOSED) {
-            return true;
-        }
-    }
-    return false;
-}
-
 // Determines whether packet is TCP packet
 // Must be an IP packet
 bool isTcp(etherHeader* ether) {
@@ -236,46 +282,18 @@ bool isTcp(etherHeader* ether) {
     return ok;
 }
 
-bool isTcpSyn(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    if (!isTcp(ether)) {
-        return false;
+bool isTcpPortOpen(etherHeader* ether) {
+    tcpHeader* tcp = getTcpHeader(ether);
+    uint16_t port = ntohs(tcp->destPort);
+    int i;
+    socket* sockets = getSockets();
+    for (i = 0; i < MAX_SOCKETS; i++) {
+        socket* s = &sockets[i];
+        if (s->localPort == port && s->state != TCP_CLOSED) {
+            return true;
+        }
     }
-    return htons(tcp->offsetFields) & SYN;
-}
-
-bool isTcpAck(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    if (!isTcp(ether)) {
-        return false;
-    }
-    return htons(tcp->offsetFields) & ACK;
-}
-
-bool isTcpFin(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    return isTcp(ether) && (htons(tcp->offsetFields) & FIN);
-}
-
-bool isTcpPsh(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    if (!isTcp(ether)) {
-        return false;
-    }
-    return htons(tcp->offsetFields) & PSH;
-}
-
-bool isTcpRst(etherHeader* ether) {
-    ipHeader* ip = (ipHeader*)ether->data;
-    tcpHeader* tcp = (tcpHeader*)((uint8_t*)ip + ip->size * 4);
-    if (!isTcp(ether)) {
-        return false;
-    }
-    return htons(tcp->offsetFields) & RST;
+    return false;
 }
 
 /*void resetConCallback(void* context) { //make this function take a parameter if needed
@@ -283,20 +301,6 @@ bool isTcpRst(etherHeader* ether) {
     snprintf(out, 100, "Could not reach %d.%d.%d.%d (timed out)\n", initSock->remoteIpAddress[0], initSock->remoteIpAddress[1], initSock->remoteIpAddress[2], initSock->remoteIpAddress[3]);
     putsUart0(out);
 }*/
-
-void tcpArpResCallback(arpRespContext resp) {
-    //when we get the MAC address
-    socket* s = (socket*)resp.ctxt;
-    copyMacAddress(s->remoteHwAddress, resp.responseMacAddress);
-    if (resp.success) {
-        completeTcpConCallback(s);
-    }
-    else {
-        //if ARP function responded with error (timed out)
-        throwSocketError(s, SOCKET_ERROR_ARP_TIMEOUT);
-        setTcpState(s, TCP_CLOSED);
-    }
-}
 
 void openTcpConnection(etherHeader* ether, socket* s) {
     resolveMacAddress(s->remoteIpAddress, tcpArpResCallback, s);
@@ -457,8 +461,8 @@ void processTcpResponse(etherHeader* ether) {
     }
 }
 
-void processTcpArpResponse(etherHeader* ether) {
-    /*uint32_t i;
+/*void processTcpArpResponse(etherHeader* ether) {
+    *uint32_t i;
     arpPacket* arp = getArpPacket(ether);
     socket* sockets = getSockets();
     for (i = 0; i < MAX_SOCKETS; i++) {
@@ -473,12 +477,8 @@ void processTcpArpResponse(etherHeader* ether) {
                 break;
             }
         }
-    }*/
-}
-
-void pendTcpResponse(socket* s, uint8_t flags) {
-    s->flags = flags;
-}
+    }*
+}*/
 
 void sendTcpResponse(etherHeader* ether, socket* s, uint16_t flags){
     uint32_t sum;

@@ -28,7 +28,6 @@
 // GLOBALS
 //=============================================================================
 
-//using all as TCP sockets
 uint8_t socketCount = 0;
 socket sockets[MAX_SOCKETS];
 
@@ -55,6 +54,7 @@ socket* newSocket(uint8_t type) {
             sockets[i].valid = 1;
             s = &sockets[i];
             s->type = type;
+            s->localPort = (random32() & 0x3FFF) + 49152;
             socketCount++;
         }
         i++;
@@ -75,15 +75,6 @@ void deleteSocket(socket* s) {
     }
 }
 
-/*void initSocket(socket* s, uint8_t remoteIp[], uint16_t remotePort) {
-    uint32_t i;
-    s->localPort = (random32() & 0x3FFF) + 49152;
-    for (i = 0; i < IP_ADD_LENGTH; i++) {
-        s->remoteIpAddress[i] = remoteIp[i];
-    }
-    s->remotePort = remotePort;
-}*/
-
 uint32_t getSocketId(socket* s) {
     uint32_t i;
     for (i = 0; i < socketCount; i++) {
@@ -98,28 +89,61 @@ socket* getSockets() {
     return sockets;
 }
 
-void socketConnectUdp() {
-
+static void socketSendToCallback(arpRespContext resp) {
+    socket* s = (socket*)resp.ctxt;
+    if (resp.success) {
+        //if MAC was retrieved
+        //finish fnNeedsMAC function
+        uint8_t buffer[MAX_PACKET_SIZE];
+        copyMacAddress(s->remoteHwAddress, resp.responseMacAddress);
+        sendUdpMessage((etherHeader*)buffer, s, s->tx_buffer, s->tx_size);
+        //deleteSocket(s);
+    }
+    else {
+        //could not resolve mac (No arp)
+        //error
+    }
 }
 
-void socketSendTo() {
-
+void socketSendTo(socket* s, uint8_t serverIp[4], uint16_t port, uint8_t data[], uint16_t length) {
+    if (s->type == SOCKET_DGRAM) {
+        getIpAddress(s->localIpAddress);
+        //s->localPort = (random32() & 0x3FFF) + 49152;
+        copyIpAddress(s->remoteIpAddress, serverIp);
+        s->remotePort = port;
+        uint8_t i;
+        for (i = 0; i < length; i++) {
+            s->tx_buffer[i] = data[i]; //copy data into tx buffer //memcpy(s->tx_buffer, data, length);
+        }
+        //s->tx_buffer = data;
+        s->tx_size = length;
+        resolveMacAddress(serverIp, socketSendToCallback, s);
+    }
+    else {
+        //not a UDP socket
+    }
 }
 
-void socketRecvFrom() {
+//return anything in the buffer
+//update the buffer in process UDP or TCP response or anothjer  response??
+void socketRecvFrom(socket* s) {
+    if (s->type == SOCKET_DGRAM) {
 
+    }
+    else {
+
+    }
 }
 
 
 void socketConnectTcp(socket* s, uint8_t serverIp[4], uint16_t port) {
     if (s->type == SOCKET_STREAM) {
         uint8_t buffer[MAX_PACKET_SIZE];
-        etherHeader* ether = (etherHeader*)buffer;
         getIpAddress(s->localIpAddress);
-        s->localPort = (random32() & 0x3FFF) + 49152;
+        //s->localPort = (random32() & 0x3FFF) + 49152;
         copyIpAddress(s->remoteIpAddress, serverIp);
         s->remotePort = port;
-        openTcpConnection(ether, s);
+        openTcpConnection((etherHeader*)buffer, s);
     }
     else {
         //not a tcp socket
@@ -128,13 +152,20 @@ void socketConnectTcp(socket* s, uint8_t serverIp[4], uint16_t port) {
 
 void socketSendTcp(socket* s, uint8_t* data, uint16_t length) {
     if (s->type == SOCKET_STREAM) {
-        uint8_t buffer[MAX_PACKET_SIZE];
-        etherHeader* ether = (etherHeader*)buffer;
-        //updateSeqNum(s, ether)
-        //memcpy(s->tx_buffer, data, length);
-        //s->tx_size = length;
-        sendTcpMessage(ether, s, PSH | ACK, data, length);
-        s->sequenceNumber += length;
+        if (s->state != TCP_ESTABLISHED) {
+            uint8_t buffer[MAX_PACKET_SIZE];
+            //updateSeqNum(s, ether)
+            uint8_t i;
+            for (i = 0; i < length; i++) {
+                s->tx_buffer[i] = data[i]; //copy data into tx buffer //memcpy(s->tx_buffer, data, length);
+            }
+            s->tx_size = length;
+            sendTcpMessage((etherHeader*)buffer, s, PSH | ACK, s->tx_buffer, s->tx_size);
+            s->sequenceNumber += length;
+        }
+        else {
+            //cannot send as TCP connection is not open
+        }
     }
     else {
         //not a TCP socket

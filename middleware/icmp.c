@@ -30,24 +30,61 @@
 #define ICMP_DEFAULT_ECHO_DATA "abcdefghijklmnopqrstuvwabcdefghi"
 #define ICMP_DEFAULT_ECHO_SIZE 32
 
-#define PING_STATE_NONE 0
-#define PING_STATE_ARPING 1
-#define PING_STATE_PINGING 2
 
 //=============================================================================
 // GLOBALS
 //=============================================================================
 
 uint32_t pingStart;
-//uint8_t pings;
 uint8_t pinging;
 uint8_t pingTimeoutTimer;
 uint8_t pingingIp[4];
-//uint8_t pingState = PING_STATE_NONE;
+
+//=============================================================================
+// STATIC FUNCTIONS
+//=============================================================================
+
+static void pingTimeoutCallback(void* c) {
+    putsUart0("Request timed out.\n");
+    pinging = 0;
+}
+
+static void icmpArpResCallback(arpRespContext resp) {
+    //when we get the MAC address
+    if (resp.success) {
+        //if MAC was retrieved
+        uint8_t buffer[MAX_PACKET_SIZE];
+        etherHeader* ether = (etherHeader*)buffer;
+        copyMacAddress(ether->destAddress, resp.responseMacAddress);
+        sendPingRequest(ether, (uint8_t*)resp.ctxt); //context is the passed IP address
+    }
+    else {
+        //if ARP timed out
+        putsUart0("Destination host unreachable.\n");
+        pinging = 0;
+    }
+}
 
 //=============================================================================
 // PUBLIC FUNCTIONS
 //=============================================================================
+
+//top level fn
+void ping(uint8_t ipAdd[]) {
+    if (!pinging) {
+        if (isIpValid(ipAdd)) {
+            pinging = 1;
+            copyIpAddress(pingingIp, ipAdd);
+            resolveMacAddress(pingingIp, icmpArpResCallback, pingingIp);
+        }
+        else {
+            putsUart0("Invalid IP Address\n");
+        }
+    }
+    else {
+        //pinging in progress
+    }
+}
 
 // Determines whether packet is ping request
 // Must be an IP packet
@@ -75,47 +112,6 @@ uint8_t isPingResponse(etherHeader* ether, icmpEchoResponse* reply) {
     }
     return NULL;
 }
-
-void pingTimeoutCallback(void* c) {
-    putsUart0("Request timed out.\n");
-    pinging = 0;
-}
-
-void icmpArpResCallback(arpRespContext resp) {
-    //when we get the MAC address
-    if (resp.success) {
-        //if MAC was retrieved
-        uint8_t buffer[MAX_PACKET_SIZE];
-        etherHeader* ether = (etherHeader*)buffer;
-        copyMacAddress(ether->destAddress, resp.responseMacAddress);
-        sendPingRequest(ether, (uint8_t*)resp.ctxt); //context is the passed IP address
-    }
-    else {
-        //if ARP timed out
-        putsUart0("Destination host unreachable.\n");
-        pinging = 0;
-    }
-}
-
-
-//top level fn
-void ping(uint8_t ipAdd[]) {
-    if (!pinging) {
-        if (isIpValid(ipAdd)) {
-            pinging = 1;
-            copyIpAddress(pingingIp, ipAdd);
-            resolveMacAddress(pingingIp, icmpArpResCallback, pingingIp);
-        }
-        else {
-            putsUart0("Invalid IP Address\n");
-        }
-    }
-    else {
-        //pinging in progress
-    }
-}
-
-
 
 void sendPingRequest(etherHeader* ether, uint8_t ipAdd[]) {
     //dest MAC need to be set before this is called
@@ -160,8 +156,7 @@ void sendPingRequest(etherHeader* ether, uint8_t ipAdd[]) {
 }
 
 // Sends a ping response given the request data
-void sendPingResponse(etherHeader *ether)
-{
+void sendPingResponse(etherHeader *ether) {
     ipHeader *ip = (ipHeader*)ether->data;
     uint8_t ipHeaderLength = ip->size * 4;
     icmpHeader *icmp = (icmpHeader*)((uint8_t*)ip + ipHeaderLength);
@@ -169,14 +164,12 @@ void sendPingResponse(etherHeader *ether)
     uint16_t icmp_size;
     uint32_t sum = 0;
     // swap source and destination fields
-    for (i = 0; i < HW_ADD_LENGTH; i++)
-    {
+    for (i = 0; i < HW_ADD_LENGTH; i++) {
         tmp = ether->destAddress[i];
         ether->destAddress[i] = ether->sourceAddress[i];
         ether->sourceAddress[i] = tmp;
     }
-    for (i = 0; i < IP_ADD_LENGTH; i++)
-    {
+    for (i = 0; i < IP_ADD_LENGTH; i++) {
         tmp = ip->destIp[i];
         ip->destIp[i] = ip ->sourceIp[i];
         ip->sourceIp[i] = tmp;

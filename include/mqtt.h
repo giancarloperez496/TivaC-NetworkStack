@@ -156,7 +156,7 @@ typedef struct _mqttHeader {// 20 or more bytes
 //=============================================================================
 
 uint32_t decodeLength(const uint8_t* data, uint16_t* dataLen);
-mqttHeader* getMqttHeader(etherHeader* ether);
+inline mqttHeader* getMqttHeader(etherHeader* ether);
 bool isMqttResponse(etherHeader* ether);
 void sendMqttConnect(mqttClient* client);
 void sendMqttConnack(mqttClient* client);

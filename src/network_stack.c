@@ -29,7 +29,7 @@ bool isNetworkReady() {
 }
 
 void netstat() {
-    putsUart0("\nTCP Info\n------------------------------------------------------------\n");
+    putsUart0("\nActive Connection\n------------------------------------------------------------\n");
     int i;
     socket* sockets = getSockets();
     for (i = 0; i < MAX_SOCKETS; i++) {
@@ -38,42 +38,50 @@ void netstat() {
             uint8_t ip[4];
             getIpAddress(ip);
             char* s;
-            switch(t.state) {
-            case TCP_CLOSED:
-                s = "CLOSED";
-                break;
-            case TCP_LISTEN:
-                s = "LISTEN";
-                break;
-            case TCP_SYN_RECEIVED:
-                s = "SYN_RECEIVED";
-                break;
-            case TCP_SYN_SENT:
-                s = "SYN_SENT";
-                break;
-            case TCP_ESTABLISHED:
-                s = "ESTABLISHED";
-                break;
-            case TCP_FIN_WAIT_1:
-                s = "FIN_WAIT_1";
-                break;
-            case TCP_FIN_WAIT_2:
-                s = "FIN_WAIT_2";
-                break;
-            case TCP_CLOSING:
-                s = "CLOSING";
-                break;
-            case TCP_CLOSE_WAIT:
-                s = "CLOSE_WAIT";
-                break;
-            case TCP_LAST_ACK:
-                s = "LAST_ACK";
-                break;
-            case TCP_TIME_WAIT:
-                s = "TIME_WAIT";
-                break;
+            char* type;
+            if (t.type == SOCKET_STREAM) {
+                type = "TCP";
+                switch(t.state) {
+                case TCP_CLOSED:
+                    s = "CLOSED";
+                    break;
+                case TCP_LISTEN:
+                    s = "LISTEN";
+                    break;
+                case TCP_SYN_RECEIVED:
+                    s = "SYN_RECEIVED";
+                    break;
+                case TCP_SYN_SENT:
+                    s = "SYN_SENT";
+                    break;
+                case TCP_ESTABLISHED:
+                    s = "ESTABLISHED";
+                    break;
+                case TCP_FIN_WAIT_1:
+                    s = "FIN_WAIT_1";
+                    break;
+                case TCP_FIN_WAIT_2:
+                    s = "FIN_WAIT_2";
+                    break;
+                case TCP_CLOSING:
+                    s = "CLOSING";
+                    break;
+                case TCP_CLOSE_WAIT:
+                    s = "CLOSE_WAIT";
+                    break;
+                case TCP_LAST_ACK:
+                    s = "LAST_ACK";
+                    break;
+                case TCP_TIME_WAIT:
+                    s = "TIME_WAIT";
+                    break;
+                }
             }
-            snprintf(out, 100, "TCP | %d.%d.%d.%d:%d -> %d.%d.%d.%d:%d - %s\n", ip[0], ip[1], ip[2], ip[3], t.localPort, t.remoteIpAddress[0], t.remoteIpAddress[1], t.remoteIpAddress[2], t.remoteIpAddress[3], t.remotePort, s);
+            else if (t.type == SOCKET_DGRAM) {
+                type = "UDP";
+                s = "";
+            }
+            snprintf(out, MAX_UART_OUT, "%s   %d.%d.%d.%d:%d -> %d.%d.%d.%d:%d   %s\n", type, ip[0], ip[1], ip[2], ip[3], t.localPort, t.remoteIpAddress[0], t.remoteIpAddress[1], t.remoteIpAddress[2], t.remoteIpAddress[3], t.remotePort, s);
             putsUart0(out);
         }
     }
@@ -177,7 +185,7 @@ void processUdpData(etherHeader* data) {
                 if (strcmp((char*)udpData, "off") == 0)
                     setPinValue(GREEN_LED, 0);
                 getSocketInfoFromUdpPacket(data, &s);
-                sendUdpMessage(data, s, (uint8_t*)"Received", 9);
+                sendUdpMessage(data, &s, (uint8_t*)"Received", 9);
             }
         }
     }

@@ -40,8 +40,7 @@ bool isUdp(etherHeader *ether) {
     uint16_t tmp16;
     uint32_t sum = 0;
     ok = (ip->protocol == PROTOCOL_UDP);
-    if (ok)
-    {
+    if (ok) {
         // 32-bit sum over pseudo-header
         sumIpWords(ip->sourceIp, 8, &sum);
         tmp16 = ip->protocol;
@@ -62,8 +61,7 @@ udpHeader* getUdpHeader(etherHeader* ether) {
 }
 
 // Gets pointer to UDP payload of frame
-uint8_t* getUdpData(etherHeader *ether)
-{
+uint8_t* getUdpData(etherHeader *ether) {
     ipHeader *ip = (ipHeader*)ether->data;
     uint8_t ipHeaderLength = ip->size * 4;
     udpHeader *udp = (udpHeader*)((uint8_t*)ip + ipHeaderLength);
@@ -71,7 +69,7 @@ uint8_t* getUdpData(etherHeader *ether)
 }
 
 // Send UDP message
-void sendUdpMessage(etherHeader* ether, socket s, uint8_t data[], uint16_t dataSize) {
+void sendUdpMessage(etherHeader* ether, socket* s, uint8_t data[], uint16_t dataSize) {
     uint16_t i;
     uint32_t sum;
     uint16_t tmp16;
@@ -83,9 +81,8 @@ void sendUdpMessage(etherHeader* ether, socket s, uint8_t data[], uint16_t dataS
     // Ether frame
     getEtherMacAddress(localHwAddress);
     getIpAddress(localIpAddress);
-    for (i = 0; i < HW_ADD_LENGTH; i++)
-    {
-        ether->destAddress[i] = s.remoteHwAddress[i]; //potentially use ARP table, socket kind of already does this.
+    for (i = 0; i < HW_ADD_LENGTH; i++) {
+        ether->destAddress[i] = s->remoteHwAddress[i]; //potentially use ARP table, socket kind of already does this.
         ether->sourceAddress[i] = localHwAddress[i];
     }
     ether->frameType = htons(TYPE_IP);
@@ -102,15 +99,15 @@ void sendUdpMessage(etherHeader* ether, socket s, uint8_t data[], uint16_t dataS
     ip->headerChecksum = 0;
     for (i = 0; i < IP_ADD_LENGTH; i++)
     {
-        ip->destIp[i] = s.remoteIpAddress[i];
+        ip->destIp[i] = s->remoteIpAddress[i];
         ip->sourceIp[i] = localIpAddress[i];
     }
     uint8_t ipHeaderLength = ip->size * 4;
 
     // UDP header
     udpHeader* udp = (udpHeader*)((uint8_t*)ip + (ip->size * 4));
-    udp->sourcePort = htons(s.localPort);
-    udp->destPort = htons(s.remotePort);
+    udp->sourcePort = htons(s->localPort);
+    udp->destPort = htons(s->remotePort);
     // adjust lengths
     udpLength = sizeof(udpHeader) + dataSize;
     ip->length = htons(ipHeaderLength + udpLength);

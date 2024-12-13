@@ -88,25 +88,25 @@ typedef struct _tcpHeader {// 20 or more bytes
 // FUNCTION PROTOTYPES
 //=============================================================================
 
-void setTcpState(socket* s, uint8_t state);
-uint8_t getTcpState(socket* s);
-tcpHeader* getTcpHeader(etherHeader* ether);
-uint8_t* getTcpData(etherHeader* ether);
-uint16_t getTcpDataLength(etherHeader* ether);
-bool isTcpPortOpen(etherHeader *ether);
+inline void setTcpState(socket* s, uint8_t state);
+inline uint8_t getTcpState(socket* s);
+inline tcpHeader* getTcpHeader(etherHeader* ether);
+inline uint8_t* getTcpData(etherHeader* ether);
+inline uint16_t getTcpDataLength(etherHeader* ether);
 bool isTcp(etherHeader *ether);
-bool isTcpSyn(etherHeader *ether);
+/*bool isTcpSyn(etherHeader *ether);
 bool isTcpAck(etherHeader *ether);
 bool isTcpFin(etherHeader* ether);
 bool isTcpPsh(etherHeader* ether);
-bool isTcpRst(etherHeader* ether);
+bool isTcpRst(etherHeader* ether);*/
+bool isTcpPortOpen(etherHeader *ether);
 void openTcpConnection(etherHeader* ether, socket* s);
 void closeTcpConnection(etherHeader* ether, socket* s);
 void sendTcpPendingMessages(etherHeader *ether);
 void processTcpResponse(etherHeader* ether);
-void processTcpArpResponse(etherHeader *ether);
+//void processTcpArpResponse(etherHeader *ether);
 //uint8_t isTcpDataAvailable(etherHeader* ether);
-void pendTcpResponse(socket* s, uint8_t flags);
+//inline void pendTcpResponse(socket* s, uint8_t flags);
 void sendTcpResponse(etherHeader *ether, socket* s, uint16_t flags);
 void sendTcpMessage(etherHeader *ether, socket* s, uint16_t flags, uint8_t data[], uint16_t dataSize);
 

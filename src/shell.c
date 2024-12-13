@@ -5,6 +5,7 @@
 #include "eth0.h"
 #include "arp.h"
 #include "ip.h"
+#include "icmp.h"
 #include "dhcp.h"
 #include "mqtt_client.h"
 #include "strlib.h"
@@ -194,6 +195,14 @@ void processShell() {
             if (str_equal(token, "ipconfig")) {
                 ipconfig();
             }
+            /*if (str_equal(token, "sendudp")) {
+                socket* udp = newSocket(SOCKET_DGRAM);
+                uint8_t destIp[4] = {192, 168, 1, 163};
+                uint16_t destPort = 8080;
+                char* data = "HelloWorld";
+                uint16_t len = str_length(data);
+                socketSendTo(udp, destIp, destPort, (uint8_t*)data, len); //async
+            }*/
             if (str_equal(token, "netstat")) {
                 netstat();
             }

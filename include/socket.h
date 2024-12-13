@@ -37,7 +37,7 @@
 #define SOCKET_ERROR_TCP_SYN_ACK_TIMEOUT 2
 #define SOCKET_ERROR_CONNECTION_RESET 3
 
-#define MAX_SOCKETS 10
+#define MAX_SOCKETS 5
 
 //=============================================================================
 // TYPEDEFS AND GLOBALS
@@ -57,15 +57,14 @@ typedef struct _socket {
     uint32_t acknowledgementNumber;
     uint32_t expectedSeqNumber;
     uint8_t  state;
-    uint8_t* rx_buffer;
-    uint16_t rx_size;
-    uint8_t* tx_buffer;
+    //uint8_t rx_buffer[512];
+    //uint16_t rx_size;
+    uint8_t tx_buffer[256]; //max buffer size
     uint16_t tx_size;
     uint16_t flags;
     uint8_t assocTimer;
     bool retransmitting;
     uint8_t connectAttempts;
-    //
     uint8_t  valid;
     _tim_callback_t errorCallback;
 } socket;
@@ -85,6 +84,7 @@ socket* newSocket(uint8_t type);
 void deleteSocket(socket *s);
 void initSocket(socket* s, uint8_t remoteIp[], uint16_t remotePort);
 socket* getSockets();
+void socketSendTo(socket* s, uint8_t serverIp[4], uint16_t port, uint8_t data[], uint16_t length);
 void socketConnectTcp(socket* s, uint8_t ip[4], uint16_t port);
 void socketSendTcp(socket* s, uint8_t* data, uint16_t length);
 //uint16_t socketRecvTcp(socket* s, uint8_t* buf);

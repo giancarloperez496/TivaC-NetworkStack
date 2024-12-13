@@ -336,7 +336,7 @@ void sendDhcpMessage(etherHeader* ether, uint8_t type) {
     //End Options - 255
     addDhcpOption(NULL, DHCP_OPTION_END_MARK, 0, 0, &options_length);
     uint16_t dhcp_length = sizeof(dhcpFrame) + (options_length);
-    sendUdpMessage(ether, s, dhcpBuffer, dhcp_length);
+    sendUdpMessage(ether, &s, dhcpBuffer, dhcp_length);
 }
 
 bool isDhcpOffer(etherHeader* ether, uint8_t ipOfferedAdd[]) {

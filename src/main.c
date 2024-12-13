@@ -111,6 +111,7 @@ int main(void) {
     initMqttClient();
     setHandlePublishCallback(handlePublish);
 
+
     while (true) {
         processShell();
         runNetworkStack();

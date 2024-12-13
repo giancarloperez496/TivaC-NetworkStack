@@ -77,11 +77,12 @@ void displayArpTable();
 void clearArpTable();
 void addArpEntry(uint8_t ipAddress[], uint8_t macAddress[]);
 uint8_t lookupArpEntry(uint8_t ipAddress[], uint8_t macAddressToWrite[]);
-bool isArpRequest(etherHeader* ether);
-bool isArpResponse(etherHeader *ether);
 inline arpPacket* getArpPacket(etherHeader* ether);
 void resolveMacAddress(uint8_t ipAdd[4], _arp_callback_t cb, void* ctxt);
+void processArpResponse(etherHeader* ether);
+bool isArpResponse(etherHeader *ether);
 void sendArpResponse(etherHeader *ether);
+bool isArpRequest(etherHeader* ether);
 void sendArpRequest(etherHeader *ether, uint8_t ipFrom[], uint8_t ipTo[]);
 
 #endif

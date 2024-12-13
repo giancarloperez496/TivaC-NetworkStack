@@ -41,9 +41,9 @@ typedef struct _udpHeader {// 8 bytes
 //=============================================================================
 
 bool isUdp(etherHeader *ether);
-udpHeader* getUdpHeader(etherHeader* ether);
-uint8_t* getUdpData(etherHeader *ether);
-void sendUdpMessage(etherHeader *ether, socket sk, uint8_t data[], uint16_t dataSize);
+inline udpHeader* getUdpHeader(etherHeader* ether);
+inline uint8_t* getUdpData(etherHeader *ether);
+void sendUdpMessage(etherHeader* ether, socket* s, uint8_t data[], uint16_t dataSize);
 
 #endif
 
